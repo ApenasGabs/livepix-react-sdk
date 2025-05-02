@@ -35,8 +35,23 @@ export default defineConfig(({ mode }) => {
         include: [/node_modules/],
       },
       rollupOptions: {
-        // Certifique-se de que pacotes externos não sejam incluídos no bundle
-        external: ["react", "react-dom"],
+        // Não externalize o React para este build específico
+        // external: ["react", "react-dom"],
+
+        // Em vez disso, use o formato de saída correto para o navegador
+        output: {
+          // Garantir que o formato de módulo seja compatível com o navegador
+          format: "es",
+          // Adicionar o sufixo .js aos imports gerados
+          entryFileNames: "[name].[hash].js",
+          chunkFileNames: "[name].[hash].js",
+          assetFileNames: "[name].[hash].[ext]",
+          // Adiciona corretamente a extensão .js às importações no bundle
+          paths: {
+            react: "./assets/react.vendor.js",
+            "react-dom": "./assets/react-dom.vendor.js",
+          },
+        },
       },
       // Garantir que o Vite não tenha problemas com dependências
       sourcemap: true,
