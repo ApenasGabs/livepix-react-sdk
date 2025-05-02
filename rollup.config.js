@@ -1,8 +1,44 @@
-import commonjs from "@rollup/plugin-commonjs";
-import json from "@rollup/plugin-json";
-import resolve from "@rollup/plugin-node-resolve";
-import typescript from "@rollup/plugin-typescript";
-import { terser } from "rollup-plugin-terser";
+const resolve = require("@rollup/plugin-node-resolve");
+const commonjs = require("@rollup/plugin-commonjs");
+const typescript = require("@rollup/plugin-typescript");
+const { terser } = require("rollup-plugin-terser");
+const json = require("@rollup/plugin-json");
+
+module.exports = {
+  input: "src/index.ts",
+  output: [
+    {
+      file: "dist/livepix-react-sdk.cjs.js",
+      format: "cjs",
+      sourcemap: true,
+    },
+    {
+      file: "dist/livepix-react-sdk.esm.js",
+      format: "esm",
+      sourcemap: true,
+    },
+    {
+      file: "dist/livepix-react-sdk.umd.js",
+      format: "umd",
+      name: "LivePixReactSDK",
+      sourcemap: true,
+      globals: {
+        react: "React",
+        "react-dom": "ReactDOM",
+      },
+    },
+  ],
+  plugins: [
+    json(),
+    resolve(),
+    commonjs(),
+    typescript({
+      tsconfig: "./tsconfig.json",
+    }),
+    terser(),
+  ],
+  external: ["react", "react-dom"],
+};
 
 export default {
   input: "src/index.ts",
