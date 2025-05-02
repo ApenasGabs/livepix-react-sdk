@@ -18,6 +18,48 @@ ou
 yarn add livepix-react-sdk
 ```
 
+## Configuração
+
+### Configurando credenciais
+
+Existem várias maneiras de configurar as credenciais da API:
+
+#### 1. Variáveis de ambiente (Recomendado)
+
+Para aplicações Vite, crie um arquivo `.env.local` na raiz do seu projeto:
+
+```
+VITE_LIVEPIX_CLIENT_ID=seu_client_id_aqui
+VITE_LIVEPIX_CLIENT_SECRET=seu_client_secret_aqui
+```
+
+Para aplicações Create React App:
+
+```
+REACT_APP_LIVEPIX_CLIENT_ID=seu_client_id_aqui
+REACT_APP_LIVEPIX_CLIENT_SECRET=seu_client_secret_aqui
+```
+
+#### 2. Fornecendo credenciais diretamente aos componentes
+
+```jsx
+<LivePixButton 
+  clientId="seu_client_id_aqui"
+  clientSecret="seu_client_secret_aqui"
+  label="Doar R$ 10,00" 
+  amount={1000}
+/>
+```
+
+#### 3. Fornecendo credenciais ao hook
+
+```jsx
+const { livePix } = useLivePix({
+  clientId: "seu_client_id_aqui",
+  clientSecret: "seu_client_secret_aqui"
+});
+```
+
 ## Uso
 
 ### Importando o SDK
@@ -32,7 +74,7 @@ import { LivePixButton, useLivePix } from 'livepix-react-sdk';
 
 Aqui está um exemplo de como utilizar o componente `LivePixButton` em sua aplicação:
 
-```typescript
+```jsx
 import React from 'react';
 import { LivePixButton } from 'livepix-react-sdk';
 
@@ -40,7 +82,11 @@ const App = () => {
     return (
         <div>
             <h1>Exemplo de Integração com LivePix</h1>
-            <LivePixButton />
+            <LivePixButton 
+              amount={1000} // R$ 10,00 (em centavos)
+              label="Doar R$ 10,00"
+              redirectUrl="https://seusite.com/obrigado"
+            />
         </div>
     );
 };
@@ -50,21 +96,51 @@ export default App;
 
 ### Hooks Personalizados
 
-O SDK também fornece hooks personalizados para facilitar a interação com a API. Por exemplo, você pode usar o hook `useLivePix` para gerenciar a lógica de autenticação e requisições.
+O SDK também fornece hooks personalizados para facilitar a interação com a API. Por exemplo, você pode usar o hook `useLivePix` para acessar todas as funcionalidades do SDK.
 
-```typescript
+```jsx
 import { useLivePix } from 'livepix-react-sdk';
 
 const MyComponent = () => {
-    const { data, error } = useLivePix();
+    const { livePix, loading, error } = useLivePix({
+      clientId: "seu_client_id", 
+      clientSecret: "seu_client_secret"
+    });
 
-    if (error) return <div>Erro ao carregar dados</div>;
-    return <div>{data}</div>;
+    const handleGetAccount = async () => {
+      if (livePix) {
+        const account = await livePix.account.getAccount();
+        console.log(account);
+      }
+    };
+
+    if (loading) return <div>Carregando...</div>;
+    if (error) return <div>Erro: {error.message}</div>;
+    
+    return (
+      <div>
+        <button onClick={handleGetAccount}>
+          Ver dados da conta
+        </button>
+      </div>
+    );
 };
 ```
+
+## Troubleshooting
+
+### Erros comuns
+
+1. **"Credenciais da API não configuradas"**
+   - Verifique se você configurou corretamente as variáveis de ambiente ou forneceu as credenciais diretamente aos componentes.
+
+2. **Erro de módulos externalizados (stream, util)**
+   - Se estiver usando Vite, adicione os polyfills necessários conforme a documentação.
 
 ## Contribuição
 
 Contribuições são bem-vindas! Sinta-se à vontade para abrir issues ou pull requests no repositório.
 
 ## Licença
+
+Este projeto está licenciado sob a licença MIT.

@@ -65,6 +65,8 @@ export interface LivePixButtonProps {
   currency?: string;
   redirectUrl?: string;
   disabled?: boolean;
+  clientId?: string;
+  clientSecret?: string;
 }
 
 export interface UseLivePixConfig {
