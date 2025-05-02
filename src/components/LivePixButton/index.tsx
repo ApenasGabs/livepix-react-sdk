@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { createLivePix } from "../../api/livePix";
+import { CONFIG } from "../../config";
 import { LivePixButtonProps } from "../../types";
-import { getEnv } from "../../utils/env";
 
 const LivePixButton: React.FC<LivePixButtonProps> = ({
   label = "Doar",
@@ -10,17 +10,22 @@ const LivePixButton: React.FC<LivePixButtonProps> = ({
   redirectUrl = window.location.href,
   onClick,
   disabled = false,
-  clientId = getEnv("VITE_LIVEPIX_CLIENT_ID"),
-  clientSecret = getEnv("VITE_LIVEPIX_CLIENT_SECRET"),
+  clientId,
+  clientSecret,
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Usar as credenciais fornecidas como prop ou obter da configuração centralizada
+  const effectiveClientId = clientId || CONFIG.auth.clientId();
+  const effectiveClientSecret = clientSecret || CONFIG.auth.clientSecret();
+
+  // Usar a função centralizada para verificar credenciais
   const credentialsAvailable = Boolean(
-    clientId &&
-      clientSecret &&
-      clientId !== "seu-client-id" &&
-      clientSecret !== "seu-client-secret"
+    effectiveClientId &&
+      effectiveClientSecret &&
+      effectiveClientId !== "seu-client-id" &&
+      effectiveClientSecret !== "seu-client-secret"
   );
 
   const handleClick = async () => {
@@ -34,8 +39,8 @@ const LivePixButton: React.FC<LivePixButtonProps> = ({
         "Credenciais da API não configuradas. Forneça clientId e clientSecret."
       );
       console.error("LivePixButton: Credenciais não configuradas", {
-        clientIdAvailable: Boolean(clientId),
-        clientSecretAvailable: Boolean(clientSecret),
+        clientIdAvailable: Boolean(effectiveClientId),
+        clientSecretAvailable: Boolean(effectiveClientSecret),
       });
       return;
     }
@@ -44,7 +49,10 @@ const LivePixButton: React.FC<LivePixButtonProps> = ({
     setError(null);
 
     try {
-      const sdk = createLivePix(clientId as string, clientSecret as string);
+      const sdk = createLivePix(
+        effectiveClientId as string,
+        effectiveClientSecret as string
+      );
 
       const payment = await sdk.payments.createPayment(
         amount,

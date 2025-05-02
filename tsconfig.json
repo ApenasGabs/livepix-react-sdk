@@ -2,6 +2,7 @@
   "compilerOptions": {
     "target": "es5",
     "module": "esnext",
+    "composite": true,
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
@@ -17,7 +18,9 @@
     "jsx": "react-jsx"
   },
   "include": [
+    "src/config",
     "src/api",
+    "src/utils",
     "src/components",
     "src/hooks",
     "src/types",

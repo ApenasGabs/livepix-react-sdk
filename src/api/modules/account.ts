@@ -7,7 +7,7 @@ export type AccountAPI = {
 
 export const createAccountApi = (apiClient: ApiClient): AccountAPI => {
   return {
-    getAccount: () => apiClient.get<AccountData>("/account"),
+    getAccount: () => apiClient.get<AccountData>("/v2/account"),
   };
 };
 

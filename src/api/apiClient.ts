@@ -1,4 +1,5 @@
 import axios from "axios";
+import { CONFIG } from "../config";
 import { OAuthTokenResponse } from "../types";
 
 export type RequestFn<T> = (token: string) => Promise<T>;
@@ -8,13 +9,14 @@ export type ApiClientConfig = {
   clientSecret: string;
   scope?: string;
   tokenUrl?: string;
+  baseUrl?: string;
 };
 
 export type ApiClient = {
   requestWithAuth: <T>(requestFn: RequestFn<T>) => Promise<T>;
-  get: <T>(url: string) => Promise<T>;
-  post: <T>(url: string, data: any) => Promise<T>;
-  delete: <T>(url: string) => Promise<T>;
+  get: <T>(path: string) => Promise<T>;
+  post: <T>(path: string, data: any) => Promise<T>;
+  delete: <T>(path: string) => Promise<T>;
 };
 
 /**
@@ -24,8 +26,9 @@ export const createApiClient = (config: ApiClientConfig): ApiClient => {
   const {
     clientId,
     clientSecret,
-    scope = "default_scope",
-    tokenUrl = "https://auth.livepix.gg/oauth/token",
+    scope = CONFIG.auth.scope(),
+    tokenUrl = CONFIG.auth.tokenUrl(),
+    baseUrl = CONFIG.api.baseUrl(),
   } = config;
 
   // Estado interno (encapsulado no closure)
@@ -64,10 +67,21 @@ export const createApiClient = (config: ApiClientConfig): ApiClient => {
   };
 
   /**
+   * Constrói a URL completa para um path
+   */
+  const buildUrl = (path: string): string => {
+    // Remover barras duplicadas se o baseUrl já tiver uma barra no final
+    // e o path começar com uma barra
+    const cleanPath = path.startsWith("/") ? path : `/${path}`;
+    return `${baseUrl}${cleanPath}`;
+  };
+
+  /**
    * Requisição GET autenticada
    */
-  const get = async <T>(url: string): Promise<T> => {
+  const get = async <T>(path: string): Promise<T> => {
     return requestWithAuth(async (token) => {
+      const url = buildUrl(path);
       const response = await axios.get<T>(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -78,8 +92,9 @@ export const createApiClient = (config: ApiClientConfig): ApiClient => {
   /**
    * Requisição POST autenticada
    */
-  const post = async <T>(url: string, data: any): Promise<T> => {
+  const post = async <T>(path: string, data: any): Promise<T> => {
     return requestWithAuth(async (token) => {
+      const url = buildUrl(path);
       const response = await axios.post<T>(url, data, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -90,8 +105,9 @@ export const createApiClient = (config: ApiClientConfig): ApiClient => {
   /**
    * Requisição DELETE autenticada
    */
-  const deleteRequest = async <T>(url: string): Promise<T> => {
+  const deleteRequest = async <T>(path: string): Promise<T> => {
     return requestWithAuth(async (token) => {
+      const url = buildUrl(path);
       const response = await axios.delete<T>(url, {
         headers: { Authorization: `Bearer ${token}` },
       });

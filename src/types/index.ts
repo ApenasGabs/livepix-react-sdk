@@ -73,9 +73,8 @@ export interface UseLivePixConfig {
   clientId: string;
   clientSecret: string;
 }
-
 export interface UseLivePixReturn {
-  livePix: any; // Substituir pelo tipo correto do LivePixSDK
+  livePix: any; // FIXME - Substituir pelo tipo correto do LivePixSDK
   loading: boolean;
   error: Error | null;
 }

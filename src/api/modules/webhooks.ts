@@ -9,12 +9,12 @@ export type WebhookAPI = {
 
 export const createWebhookApi = (apiClient: ApiClient): WebhookAPI => {
   return {
-    getWebhooks: () => apiClient.get<WebhookData[]>("/webhooks"),
+    getWebhooks: () => apiClient.get<WebhookData[]>("/v2/webhooks"),
 
     createWebhook: (url: string) =>
-      apiClient.post<WebhookData>("/webhooks", { url }),
+      apiClient.post<WebhookData>("/v2/webhooks", { url }),
 
-    deleteWebhook: (id: string) => apiClient.delete<void>(`/webhooks/${id}`),
+    deleteWebhook: (id: string) => apiClient.delete<void>(`/v2/webhooks/${id}`),
   };
 };
 
