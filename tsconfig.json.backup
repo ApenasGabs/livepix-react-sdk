@@ -14,18 +14,13 @@
     "esModuleInterop": true,
     "moduleResolution": "node",
     "resolveJsonModule": true,
+    "isolatedModules": true,
     "jsx": "react-jsx"
   },
-  "include": [
-    "src/api",
-    "src/components",
-    "src/hooks",
-    "src/types",
-    "src/index.ts"
-  ],
+  "include": ["src"],
   "exclude": [
     "node_modules",
-    "dist",
+    "build",
     "example",
     "**/*.test.ts",
     "**/*.test.tsx"

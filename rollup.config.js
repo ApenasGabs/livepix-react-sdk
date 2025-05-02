@@ -1,30 +1,30 @@
-const resolve = require('@rollup/plugin-node-resolve');
-const commonjs = require('@rollup/plugin-commonjs');
-const typescript = require('@rollup/plugin-typescript');
-const { terser } = require('rollup-plugin-terser');
-const json = require('@rollup/plugin-json');
+const resolve = require("@rollup/plugin-node-resolve");
+const commonjs = require("@rollup/plugin-commonjs");
+const typescript = require("@rollup/plugin-typescript");
+const { terser } = require("rollup-plugin-terser");
+const json = require("@rollup/plugin-json");
 
 module.exports = {
-  input: 'src/index.ts',
+  input: "src/index.ts",
   output: [
     {
-      file: 'dist/livepix-react-sdk.cjs.js',
-      format: 'cjs',
+      file: "dist/livepix-react-sdk.cjs.js",
+      format: "cjs",
       sourcemap: true,
     },
     {
-      file: 'dist/livepix-react-sdk.esm.js',
-      format: 'esm',
+      file: "dist/livepix-react-sdk.esm.js",
+      format: "esm",
       sourcemap: true,
     },
     {
-      file: 'dist/livepix-react-sdk.umd.js',
-      format: 'umd',
-      name: 'LivePixReactSDK',
+      file: "dist/livepix-react-sdk.umd.js",
+      format: "umd",
+      name: "LivePixReactSDK",
       sourcemap: true,
       globals: {
-        react: 'React',
-        'react-dom': 'ReactDOM',
+        react: "React",
+        "react-dom": "ReactDOM",
       },
     },
   ],
@@ -33,9 +33,45 @@ module.exports = {
     resolve(),
     commonjs(),
     typescript({
-      tsconfig: './tsconfig.json',
+      tsconfig: "./tsconfig.json",
     }),
     terser(),
   ],
-  external: ['react', 'react-dom'],
+  external: ["react", "react-dom"],
+};
+
+export default {
+  input: "src/index.ts",
+  output: [
+    {
+      file: "dist/livepix-react-sdk.cjs.js",
+      format: "cjs",
+      sourcemap: true,
+    },
+    {
+      file: "dist/livepix-react-sdk.esm.js",
+      format: "esm",
+      sourcemap: true,
+    },
+    {
+      file: "dist/livepix-react-sdk.umd.js",
+      format: "umd",
+      name: "LivePixReactSDK",
+      sourcemap: true,
+      globals: {
+        react: "React",
+        "react-dom": "ReactDOM",
+      },
+    },
+  ],
+  plugins: [
+    resolve(),
+    commonjs(),
+    typescript({
+      tsconfig: "./tsconfig.json",
+    }),
+    json(),
+    terser(),
+  ],
+  external: ["react", "react-dom"],
 };
