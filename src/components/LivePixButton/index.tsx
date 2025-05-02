@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { createLivePix } from "../../api/livePix";
 import { LivePixButtonProps } from "../../types";
+import { getEnv } from "../../utils/env";
 
 const LivePixButton: React.FC<LivePixButtonProps> = ({
   label = "Doar",
@@ -116,6 +117,3 @@ const LivePixButton: React.FC<LivePixButtonProps> = ({
 };
 
 export default LivePixButton;
-function getEnv(arg0: string): string | undefined {
-  throw new Error("Function not implemented.");
-}
