@@ -1,0 +1,41 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Run linting
+        run: yarn lint || echo "No lint command configured"
+
+      - name: Run tests
+        run: yarn test
+        env:
+          LIVEPIX_CLIENT_ID: ${{ secrets.LIVEPIX_CLIENT_ID }}
+          LIVEPIX_CLIENT_SECRET: ${{ secrets.LIVEPIX_CLIENT_SECRET }}
+
+      - name: Upload test coverage
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }} # Opcional, se usar codecov.io
+          directory: ./coverage/
+          fail_ci_if_error: false
