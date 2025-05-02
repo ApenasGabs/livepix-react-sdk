@@ -30,6 +30,17 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    build: {
+      commonjsOptions: {
+        include: [/node_modules/],
+      },
+      rollupOptions: {
+        // Certifique-se de que pacotes externos não sejam incluídos no bundle
+        external: ["react", "react-dom"],
+      },
+      // Garantir que o Vite não tenha problemas com dependências
+      sourcemap: true,
+    },
     define: {
       ...Object.keys(env)
         .filter((key) => key.startsWith("VITE_"))
