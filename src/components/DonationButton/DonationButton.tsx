@@ -1,6 +1,6 @@
 import { useState } from "react";
-// Trocar a importação externa pelo nosso SDK funcional interno
 import { createLivePix } from "../../api/livePix";
+import { CONFIG } from "../../config";
 
 const DonationButton = () => {
   const [amount, setAmount] = useState(1000); // Valor padrão R$10,00 em centavos
@@ -12,16 +12,16 @@ const DonationButton = () => {
     setError(null);
 
     try {
-      // Usar nosso SDK funcional
+      // Usar nosso SDK funcional com as configurações centralizadas
       const livePix = createLivePix(
-        process.env.LIVEPIX_CLIENT_ID || "",
-        process.env.LIVEPIX_CLIENT_SECRET || ""
+        CONFIG.auth.clientId(),
+        CONFIG.auth.clientSecret()
       );
 
       const payment = await livePix.payments.createPayment(
         amount,
-        "BRL",
-        window.location.href
+        CONFIG.payment.defaultCurrency(),
+        CONFIG.payment.defaultRedirectUrl()
       );
 
       // Redirecionar para o URL de pagamento

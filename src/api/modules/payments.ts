@@ -14,16 +14,16 @@ export type PaymentAPI = {
 export const createPaymentApi = (apiClient: ApiClient): PaymentAPI => {
   return {
     createPayment: (amount: number, currency: string, redirectUrl: string) =>
-      apiClient.post<PaymentData>("/payments", {
+      apiClient.post<PaymentData>("/v2/payments", {
         amount,
         currency,
         redirectUrl,
       }),
 
-    getPayments: () => apiClient.get<GetPaymentData[]>("/payments"),
+    getPayments: () => apiClient.get<GetPaymentData[]>("/v2/payments"),
 
     getPayment: (id: string) =>
-      apiClient.get<GetPaymentData>(`/payments/${id}`),
+      apiClient.get<GetPaymentData>(`/v2/payments/${id}`),
   };
 };
 

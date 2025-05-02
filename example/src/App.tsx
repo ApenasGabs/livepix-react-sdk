@@ -1,34 +1,109 @@
-import { LivePixButton, useLivePix } from "livepix-react-sdk";
+import { getEnv, LivePixButton, useLivePix } from "livepix-react-sdk";
 import { useEffect, useState } from "react";
-import { getEnv } from "../../src/utils/env";
 import "./App.css";
+import TokenConfigForm from "./components/TokenConfigForm";
+
+// Componente de diagnóstico para variáveis de ambiente
+const EnvDebug = () => {
+  const clientId = getEnv("VITE_LIVEPIX_CLIENT_ID", "");
+  const clientSecret = getEnv("VITE_LIVEPIX_CLIENT_SECRET", "");
+
+  return (
+    <div
+      style={{
+        padding: "16px",
+        margin: "16px 0",
+        backgroundColor: "#f8f9fa",
+        borderRadius: "8px",
+      }}
+    >
+      <h3>Depuração de Variáveis de Ambiente</h3>
+      <p>
+        Client ID:{" "}
+        {clientId
+          ? `${clientId.substring(0, 4)}...${clientId.substring(
+              clientId.length - 4
+            )}`
+          : "❌ Não definido"}
+      </p>
+      <p>
+        Client Secret:{" "}
+        {clientSecret
+          ? `${clientSecret.substring(0, 4)}...${clientSecret.substring(
+              clientSecret.length - 4
+            )}`
+          : "❌ Não definido"}
+      </p>
+      <p>
+        <small>
+          Nota: As credenciais são mostradas parcialmente por motivos de
+          segurança. Se você não vê os valores, verifique o arquivo .env.local
+        </small>
+      </p>
+    </div>
+  );
+};
 
 function App() {
   const [amount, setAmount] = useState(1000);
   const [configWarning, setConfigWarning] = useState<string | null>(null);
+  const [showConfigForm, setShowConfigForm] = useState(false);
+  const [customClientId, setCustomClientId] = useState("");
+  const [customClientSecret, setCustomClientSecret] = useState("");
+
+  // Estado para rastrear se estamos usando credenciais personalizadas
+  const [usingCustomCredentials, setUsingCustomCredentials] = useState(false);
+
+  // Obtém credenciais do .env.local ou usa as personalizadas
+  const getCredentials = () => {
+    if (usingCustomCredentials) {
+      return {
+        clientId: customClientId,
+        clientSecret: customClientSecret,
+      };
+    }
+
+    return {
+      clientId: getEnv("VITE_LIVEPIX_CLIENT_ID", ""),
+      clientSecret: getEnv("VITE_LIVEPIX_CLIENT_SECRET", ""),
+    };
+  };
+
+  // Handler para salvar credenciais personalizadas
+  const handleSaveCredentials = (clientId: string, clientSecret: string) => {
+    setCustomClientId(clientId);
+    setCustomClientSecret(clientSecret);
+    setUsingCustomCredentials(true);
+
+    // Reinicializa o SDK com as novas credenciais
+    setReloadSDK((prev) => !prev); // Alterna o valor para forçar reinicialização
+  };
+
+  // Estado para forçar o recarregamento do SDK quando as credenciais mudam
+  const [reloadSDK, setReloadSDK] = useState(false);
 
   useEffect(() => {
-    const clientId = getEnv("VITE_LIVEPIX_CLIENT_ID");
-    const clientSecret = getEnv("VITE_LIVEPIX_CLIENT_SECRET");
+    const { clientId, clientSecret } = getCredentials();
 
-    if (
-      !clientId ||
-      clientId === "seu-client-id" ||
-      !clientSecret ||
-      clientSecret === "seu-client-secret"
-    ) {
+    const hasValidConfig =
+      clientId &&
+      clientSecret &&
+      clientId !== "seu_client_id_aqui" &&
+      clientSecret !== "seu_client_secret_aqui";
+
+    if (!hasValidConfig) {
       setConfigWarning(
-        "⚠️ As credenciais da API não foram configuradas. Crie um arquivo .env.local com VITE_LIVEPIX_CLIENT_ID e VITE_LIVEPIX_CLIENT_SECRET."
+        "⚠️ As credenciais da API não foram configuradas. Use o formulário abaixo para testar com suas próprias credenciais."
       );
     } else {
       setConfigWarning(null);
     }
-  }, []);
+  }, [customClientId, customClientSecret, usingCustomCredentials]);
 
   // Exemplo usando o hook
   const { livePix, loading, error } = useLivePix({
-    clientId: getEnv("VITE_LIVEPIX_CLIENT_ID", "seu-client-id"),
-    clientSecret: getEnv("VITE_LIVEPIX_CLIENT_SECRET", "seu-client-secret"),
+    clientId: getCredentials().clientId || "seu_client_id_aqui",
+    clientSecret: getCredentials().clientSecret || "seu_client_secret_aqui",
   });
 
   const handleGetAccount = async () => {
@@ -37,8 +112,16 @@ function App() {
     try {
       const account = await livePix.account.getAccount();
       console.log("Dados da conta:", account);
+      alert(
+        `Conta carregada com sucesso!\nNome: ${account.displayName}\nUsuário: ${account.username}`
+      );
     } catch (err) {
       console.error("Erro ao buscar conta:", err);
+      alert(
+        `Erro ao buscar conta: ${
+          err instanceof Error ? err.message : "Erro desconhecido"
+        }`
+      );
     }
   };
 
@@ -48,6 +131,35 @@ function App() {
         <h1>LivePix React SDK - Demo</h1>
 
         {configWarning && <div className="warning-banner">{configWarning}</div>}
+
+        <div className="section">
+          <div className="config-section-header">
+            <h2>Configurar Credenciais</h2>
+            <button
+              className="toggle-config-btn"
+              onClick={() => setShowConfigForm(!showConfigForm)}
+            >
+              {showConfigForm ? "Ocultar Formulário" : "Mostrar Formulário"}
+            </button>
+          </div>
+
+          {showConfigForm && (
+            <TokenConfigForm
+              initialClientId={getCredentials().clientId}
+              initialClientSecret={getCredentials().clientSecret}
+              onSave={handleSaveCredentials}
+            />
+          )}
+
+          {usingCustomCredentials && (
+            <div className="custom-credentials-info">
+              ✅ Usando credenciais personalizadas
+            </div>
+          )}
+
+          {/* Componente de diagnóstico de variáveis de ambiente */}
+          <EnvDebug />
+        </div>
 
         <div className="section">
           <h2>LivePixButton Component</h2>
@@ -66,6 +178,8 @@ function App() {
             amount={amount}
             label={`Doar R$ ${(amount / 100).toFixed(2)}`}
             redirectUrl="https://example.com/success"
+            clientId={getCredentials().clientId}
+            clientSecret={getCredentials().clientSecret}
           />
         </div>
 
@@ -87,6 +201,18 @@ function App() {
 
         <div className="section">
           <h2>Como configurar credenciais</h2>
+          <p>Você pode configurar suas credenciais de duas formas:</p>
+          <ol style={{ textAlign: "left" }}>
+            <li>
+              <strong>Temporariamente:</strong> Use o formulário acima para
+              testar o SDK rapidamente (as credenciais serão perdidas ao
+              recarregar a página).
+            </li>
+            <li>
+              <strong>Permanentemente:</strong> Crie um arquivo .env.local na
+              pasta example com:
+            </li>
+          </ol>
           <pre>
             {`
 # Crie um arquivo .env.local na raiz do projeto com:

@@ -7,7 +7,7 @@ export type CurrenciesAPI = {
 
 export const createCurrenciesApi = (apiClient: ApiClient): CurrenciesAPI => {
   return {
-    getCurrencies: () => apiClient.get<CurrencyData[]>("/currencies"),
+    getCurrencies: () => apiClient.get<CurrencyData[]>("/v2/currencies"),
   };
 };
 
