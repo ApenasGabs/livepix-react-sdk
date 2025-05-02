@@ -150,4 +150,8 @@ Contribuições são bem-vindas! Sinta-se à vontade para abrir issues ou pull r
 
 ## Licença
 
-Este projeto está licenciado sob a [Licença MIT com Commons Clause](https://commonsclause.com/).
+Este projeto está licenciado sob a [Licença MIT com Commons Clause](https://commonsclause.com/). A Commons Clause adiciona restrições ao uso comercial do software. Para mais detalhes, consulte o arquivo [LICENSE](./LICENSE).
+
+### Nota para Contribuidores
+
+Contribuidores devem estar cientes de que a Commons Clause restringe o uso comercial do software, mesmo que ele seja baseado na Licença MIT. Certifique-se de entender essas implicações antes de contribuir.
