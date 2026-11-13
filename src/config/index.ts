@@ -11,16 +11,21 @@ export const CONFIG = {
     clientId: () => getClientId(),
     clientSecret: () => getClientSecret(),
     tokenUrl: () => {
+      const customUrl = getEnv("VITE_LIVEPIX_TOKEN_URL");
+      if (customUrl) {
+        return customUrl;
+      }
       // Em ambiente de desenvolvimento local, usar o proxy configurado no Vite
       if (isLocalDevelopment()) {
-        return "/oauth/token";
+        return "/oauth2/token";
       }
-      return getEnv(
-        "VITE_LIVEPIX_TOKEN_URL",
-        "https://auth.livepix.gg/oauth/token"
-      );
+      return "https://oauth.livepix.gg/oauth2/token";
     },
-    scope: () => getEnv("VITE_LIVEPIX_SCOPE", "default_scope"),
+    scope: () =>
+      getEnv(
+        "VITE_LIVEPIX_SCOPE",
+        "payments:read payments:write offline account:read currencies:read rewards:read rewards:write messages:read messages:write subscriptions:read subscriptions:write subscription-plans:read subscription-plans:write wallet:read webhooks controls"
+      ),
   },
 
   // URLs de serviço
@@ -46,6 +51,9 @@ export const CONFIG = {
  * Verifica se o ambiente atual é de desenvolvimento local (localhost)
  */
 function isLocalDevelopment(): boolean {
+  if (typeof process !== "undefined" && process.env.NODE_ENV === "test") {
+    return false;
+  }
   if (typeof window !== "undefined") {
     const hostname = window.location.hostname;
     return hostname === "localhost" || hostname === "127.0.0.1";

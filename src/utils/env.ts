@@ -1,36 +1,53 @@
+type ImportMetaEnvHolder = {
+  env?: Record<string, string | undefined>;
+};
+
+type GlobalWithImport = typeof globalThis & {
+  import?: {
+    meta?: ImportMetaEnvHolder;
+  };
+};
+
+const getImportMetaEnv = (): Record<string, string | undefined> | undefined => {
+  try {
+    return new Function(
+      'return typeof import.meta !== "undefined" ? import.meta.env : undefined'
+    )();
+  } catch {
+    return typeof globalThis !== "undefined"
+      ? (globalThis as GlobalWithImport)?.import?.meta?.env
+      : undefined;
+  }
+};
+
 export const getEnv = (key: string, defaultValue: string = ""): string => {
-  // Para Vite
-  // @ts-ignore
-  if (typeof import.meta !== "undefined" && import.meta.env) {
+  // Para Vite / ESM
+  const metaEnv = getImportMetaEnv();
+  if (metaEnv) {
     // Teste direto para casos específicos do Vite
-    // @ts-ignore
-    if (key.startsWith("VITE_") && import.meta.env[key]) {
-      // @ts-ignore
-      return import.meta.env[key];
+    if (key.startsWith("VITE_") && metaEnv[key]) {
+      return metaEnv[key] ?? defaultValue;
     }
 
     // Caso especial para lidar com conversões de nomes de variáveis
     if (key.startsWith("VITE_")) {
       const reactAppKey = key.replace("VITE_", "REACT_APP_");
-      // @ts-ignore
-      if (import.meta.env[reactAppKey]) {
-        // @ts-ignore
-        return import.meta.env[reactAppKey];
+      if (metaEnv[reactAppKey]) {
+        return metaEnv[reactAppKey] ?? defaultValue;
       }
     }
 
     if (key.startsWith("REACT_APP_")) {
       const viteKey = key.replace("REACT_APP_", "VITE_");
-      // @ts-ignore
-      if (import.meta.env[viteKey]) {
-        // @ts-ignore
-        return import.meta.env[viteKey];
+      if (metaEnv[viteKey]) {
+        return metaEnv[viteKey] ?? defaultValue;
       }
     }
 
     // Fallback geral para o Vite
-    // @ts-ignore
-    return import.meta.env[key] || defaultValue;
+    if (metaEnv[key]) {
+      return metaEnv[key] ?? defaultValue;
+    }
   }
 
   // Para Node.js/processo
@@ -44,14 +61,14 @@ export const getEnv = (key: string, defaultValue: string = ""): string => {
     if (key.startsWith("VITE_")) {
       const reactAppKey = key.replace("VITE_", "REACT_APP_");
       if (process.env[reactAppKey]) {
-        return process.env[reactAppKey];
+        return process.env[reactAppKey] || defaultValue;
       }
     }
 
     if (key.startsWith("REACT_APP_")) {
       const viteKey = key.replace("REACT_APP_", "VITE_");
       if (process.env[viteKey]) {
-        return process.env[viteKey];
+        return process.env[viteKey] || defaultValue;
       }
     }
   }
