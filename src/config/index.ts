@@ -51,7 +51,10 @@ export const CONFIG = {
  * Verifica se o ambiente atual é de desenvolvimento local (localhost)
  */
 function isLocalDevelopment(): boolean {
-  if (typeof process !== "undefined" && process.env.NODE_ENV === "test") {
+  if (
+    typeof process !== "undefined" &&
+    (process.env.NODE_ENV === "test" || process.env.JEST_WORKER_ID !== undefined)
+  ) {
     return false;
   }
   if (typeof window !== "undefined") {

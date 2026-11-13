@@ -1,4 +1,4 @@
-declare type RequestFn<T> = (token: string) => Promise<T>;
+export type RequestFn<T> = (token: string) => Promise<T>;
 
 export interface APIClientOptions {
   clientId: string;
@@ -74,7 +74,7 @@ export interface UseLivePixConfig {
   clientSecret: string;
 }
 export interface UseLivePixReturn {
-  livePix: any; // FIXME - Substituir pelo tipo correto do LivePixSDK
+  livePix: unknown; // FIXME - Substituir pelo tipo correto do LivePixSDK
   loading: boolean;
   error: Error | null;
 }

@@ -10,7 +10,7 @@ describe("CONFIG - LivePix v2 Contracts", () => {
 
   beforeEach(() => {
     jest.resetModules();
-    process.env = { ...originalEnv };
+    process.env = { ...originalEnv, NODE_ENV: "test" };
   });
 
   afterAll(() => {
