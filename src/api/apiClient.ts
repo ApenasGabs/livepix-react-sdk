@@ -15,12 +15,28 @@ export type ApiClientConfig = {
 export type ApiClient = {
   requestWithAuth: <T>(requestFn: RequestFn<T>) => Promise<T>;
   get: <T>(path: string) => Promise<T>;
-  post: <T>(path: string, data: any) => Promise<T>;
+  post: <T>(path: string, data?: unknown) => Promise<T>;
+  put: <T>(path: string, data?: unknown) => Promise<T>;
+  patch: <T>(path: string, data?: unknown) => Promise<T>;
   delete: <T>(path: string) => Promise<T>;
+  getAccessToken: (forceRefresh?: boolean) => Promise<string>;
 };
 
 /**
- * Cria um cliente de API funcional com gerenciamento de autenticação
+ * Desempacota o envelope `{ data: T }` da LivePix API v2.
+ * Se a resposta possuir a propriedade `data`, retorna `response.data.data`.
+ * Caso contrário, retorna `response.data` como fallback.
+ */
+export const unwrapResponse = <T>(response: { data: unknown }): T => {
+  const body = response?.data;
+  if (body !== null && typeof body === "object" && "data" in body) {
+    return (body as { data: T }).data;
+  }
+  return body as T;
+};
+
+/**
+ * Cria um cliente de API funcional com gerenciamento de autenticação OAuth2 e suporte a LivePix v2
  */
 export const createApiClient = (config: ApiClientConfig): ApiClient => {
   const {
@@ -36,82 +52,144 @@ export const createApiClient = (config: ApiClientConfig): ApiClient => {
   let tokenExpiresAt: Date | null = null;
 
   /**
-   * Obtém um token de acesso válido
+   * Obtém um token de acesso válido via application/x-www-form-urlencoded
+   * Se forceRefresh for true, ignora o cache interno e busca um novo token
    */
-  const getAccessToken = async (): Promise<string> => {
-    // Verifica se o token atual é válido
-    if (accessToken && tokenExpiresAt && new Date() < tokenExpiresAt) {
+  const getAccessToken = async (forceRefresh = false): Promise<string> => {
+    // Verifica se o token atual é válido no cache
+    if (!forceRefresh && accessToken && tokenExpiresAt && new Date() < tokenExpiresAt) {
       return accessToken;
     }
 
-    const response = await axios.post<OAuthTokenResponse>(tokenUrl, {
+    const params = new URLSearchParams({
       grant_type: "client_credentials",
       client_id: clientId,
       client_secret: clientSecret,
-      scope,
     });
 
-    accessToken = response.data.access_token;
-    // Assume que expires_in é em segundos
-    tokenExpiresAt = new Date(Date.now() + response.data.expires_in * 1000);
+    if (scope) {
+      params.append("scope", scope);
+    }
 
-    return accessToken;
+    const response = await axios.post<OAuthTokenResponse>(tokenUrl, params, {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    });
+
+    const body = response.data;
+    const payload =
+      body !== null && typeof body === "object" && "data" in body
+        ? (body as { data: OAuthTokenResponse }).data
+        : body;
+
+    if (!payload?.access_token) {
+      throw new Error("Resposta do endpoint OAuth não contém access_token válido.");
+    }
+
+    const token = String(payload.access_token);
+    accessToken = token;
+
+    // Assume que expires_in é em segundos com margem de segurança de 60 segundos
+    const expiresIn = Number(payload.expires_in) || 3600;
+    tokenExpiresAt = new Date(Date.now() + Math.max(expiresIn - 60, 10) * 1000);
+
+    return token;
   };
 
   /**
-   * Executa uma requisição autenticada
+   * Executa uma requisição autenticada com retry transparente em HTTP 401
    */
   const requestWithAuth = async <T>(requestFn: RequestFn<T>): Promise<T> => {
     const token = await getAccessToken();
-    return requestFn(token);
+    try {
+      return await requestFn(token);
+    } catch (error: unknown) {
+      const is401 =
+        error !== null &&
+        typeof error === "object" &&
+        "response" in error &&
+        (error as { response?: { status?: number } }).response?.status === 401;
+
+      if (is401) {
+        // Token expirado ou rejeitado: renova forçadamente e repete uma única vez
+        const freshToken = await getAccessToken(true);
+        return await requestFn(freshToken);
+      }
+      throw error;
+    }
   };
 
   /**
    * Constrói a URL completa para um path
    */
   const buildUrl = (path: string): string => {
-    // Remover barras duplicadas se o baseUrl já tiver uma barra no final
-    // e o path começar com uma barra
     const cleanPath = path.startsWith("/") ? path : `/${path}`;
     return `${baseUrl}${cleanPath}`;
   };
 
   /**
-   * Requisição GET autenticada
+   * Requisição GET autenticada com desempacotamento de envelope { data: T }
    */
   const get = async <T>(path: string): Promise<T> => {
     return requestWithAuth(async (token) => {
       const url = buildUrl(path);
-      const response = await axios.get<T>(url, {
+      const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      return response.data;
+      return unwrapResponse<T>(response);
     });
   };
 
   /**
-   * Requisição POST autenticada
+   * Requisição POST autenticada com desempacotamento de envelope { data: T }
    */
-  const post = async <T>(path: string, data: any): Promise<T> => {
+  const post = async <T>(path: string, data?: unknown): Promise<T> => {
     return requestWithAuth(async (token) => {
       const url = buildUrl(path);
-      const response = await axios.post<T>(url, data, {
+      const response = await axios.post(url, data, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      return response.data;
+      return unwrapResponse<T>(response);
     });
   };
 
   /**
-   * Requisição DELETE autenticada
+   * Requisição PUT autenticada com desempacotamento de envelope { data: T }
+   */
+  const put = async <T>(path: string, data?: unknown): Promise<T> => {
+    return requestWithAuth(async (token) => {
+      const url = buildUrl(path);
+      const response = await axios.put(url, data, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return unwrapResponse<T>(response);
+    });
+  };
+
+  /**
+   * Requisição PATCH autenticada com desempacotamento de envelope { data: T }
+   */
+  const patch = async <T>(path: string, data?: unknown): Promise<T> => {
+    return requestWithAuth(async (token) => {
+      const url = buildUrl(path);
+      const response = await axios.patch(url, data, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return unwrapResponse<T>(response);
+    });
+  };
+
+  /**
+   * Requisição DELETE autenticada com desempacotamento de envelope { data: T }
    */
   const deleteRequest = async <T>(path: string): Promise<T> => {
     return requestWithAuth(async (token) => {
       const url = buildUrl(path);
-      const response = await axios.delete<T>(url, {
+      const response = await axios.delete(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      return response.data;
+      return unwrapResponse<T>(response);
     });
   };
 
@@ -119,7 +197,10 @@ export const createApiClient = (config: ApiClientConfig): ApiClient => {
     requestWithAuth,
     get,
     post,
+    put,
+    patch,
     delete: deleteRequest,
+    getAccessToken,
   };
 };
 
