@@ -1,75 +1,129 @@
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import LivePixButton from '../index';
+import "@testing-library/jest-dom";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import axios from "axios";
+import LivePixButton from "../index";
 
-// Mock do módulo createLivePix
-jest.mock('../../../api/livePix', () => ({
-  createLivePix: jest.fn().mockReturnValue({
-    payments: {
-      createPayment: jest.fn().mockResolvedValue({
-        redirectUrl: 'https://payment-url.com'
-      })
-    }
-  })
-}));
+jest.mock("axios");
+const mockedAxios = axios as jest.Mocked<typeof axios>;
 
-describe('LivePixButton', () => {
+describe("LivePixButton (Dual Server/Client Security Architecture)", () => {
   beforeEach(() => {
-    // Limpar todos os mocks entre os testes
     jest.clearAllMocks();
-    
-    // Mock da função window.location.href
-    Object.defineProperty(window, 'location', {
-      value: {
-        href: jest.fn()
-      },
-      writable: true
-    });
+    window.location.href = "https://app.example.com/donate";
   });
-  
-  it('renders correctly with default props', () => {
+
+  it("renders correctly with default props", () => {
     render(<LivePixButton />);
-    expect(screen.getByRole('button')).toHaveTextContent('Doar');
+    expect(screen.getByRole("button")).toHaveTextContent("Doar");
   });
-  
-  it('shows warning when credentials are not available', () => {
-    render(<LivePixButton clientId="" clientSecret="" />);
-    expect(screen.getByText(/credenciais da api não configuradas/i)).toBeInTheDocument();
+
+  it("shows warning when neither BFF endpoint nor public link is configured", () => {
+    render(<LivePixButton />);
+    expect(
+      screen.getByText(/credenciais da api não configuradas/i)
+    ).toBeInTheDocument();
   });
-  
-  it('shows custom label when provided', () => {
-    render(<LivePixButton label="Doar R$ 5,00" />);
-    expect(screen.getByRole('button')).toHaveTextContent('Doar R$ 5,00');
+
+  it("shows custom label when provided", () => {
+    render(<LivePixButton label="Doar R$ 5,00" username="apenasgabs" />);
+    expect(screen.getByRole("button")).toHaveTextContent("Doar R$ 5,00");
   });
-  
-  it('becomes disabled when disabled prop is true', () => {
-    render(<LivePixButton disabled />);
-    expect(screen.getByRole('button')).toBeDisabled();
+
+  it("becomes disabled when disabled prop is true", () => {
+    render(<LivePixButton disabled username="apenasgabs" />);
+    expect(screen.getByRole("button")).toBeDisabled();
   });
-  
-  it('calls onClick callback when provided', async () => {
+
+  it("calls onClick callback when provided", async () => {
     const mockOnClick = jest.fn();
     render(<LivePixButton onClick={mockOnClick} />);
-    
-    await userEvent.click(screen.getByRole('button'));
-    
+
+    await userEvent.click(screen.getByRole("button"));
+
     expect(mockOnClick).toHaveBeenCalledTimes(1);
   });
-  
-  it('redirects to payment URL when button is clicked', async () => {
+
+  it("redirects via BFF paymentEndpoint without requiring clientSecret in browser", async () => {
+    mockedAxios.post.mockResolvedValueOnce({
+      data: {
+        data: {
+          redirectUrl: "https://livepix.gg/checkout/bff-payment-123",
+          reference: "ref_123",
+        },
+      },
+    });
+
     render(
-      <LivePixButton 
-        clientId="test-client-id" 
-        clientSecret="test-client-secret"
-        amount={1000}
+      <LivePixButton
+        paymentEndpoint="/api/livepix/payments"
+        amount={1500}
         currency="BRL"
-        redirectUrl="https://example.com/success" 
+        redirectUrl="https://example.com/thanks"
       />
     );
-    
-    await userEvent.click(screen.getByRole('button'));
-    
-    // Verifica se o redirecionamento ocorreu
-    expect(window.location.href).toBe('https://payment-url.com');
+
+    await userEvent.click(screen.getByRole("button"));
+
+    expect(mockedAxios.post).toHaveBeenCalledWith("/api/livepix/payments", {
+      amount: 1500,
+      currency: "BRL",
+      redirectUrl: "https://example.com/thanks",
+    });
+    expect(window.location.href).toBe(
+      "https://livepix.gg/checkout/bff-payment-123"
+    );
+  });
+
+  it("redirects via BFF proxyUrl appending /payments", async () => {
+    mockedAxios.post.mockResolvedValueOnce({
+      data: {
+        redirectUrl: "https://livepix.gg/checkout/proxy-456",
+        reference: "ref_456",
+      },
+    });
+
+    render(<LivePixButton proxyUrl="/api/livepix" amount={2000} />);
+
+    await userEvent.click(screen.getByRole("button"));
+
+    expect(mockedAxios.post).toHaveBeenCalledWith("/api/livepix/payments", {
+      amount: 2000,
+      currency: "BRL",
+      redirectUrl: "https://app.example.com/donate",
+    });
+    expect(window.location.href).toBe("https://livepix.gg/checkout/proxy-456");
+  });
+
+  it("redirects to public creator page when username is provided", async () => {
+    render(<LivePixButton username="@apenasgabs" />);
+
+    await userEvent.click(screen.getByRole("button"));
+
+    expect(window.location.href).toBe("https://livepix.gg/apenasgabs");
+  });
+
+  it("emits security warning and blocks execution when clientSecret is passed in browser", async () => {
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+    render(
+      <LivePixButton
+        clientId="exposed-id"
+        clientSecret="exposed-secret"
+        redirectUrl="https://example.com/return"
+      />
+    );
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[LivePix Security Warning]")
+    );
+
+    await userEvent.click(screen.getByRole("button"));
+
+    expect(
+      screen.getByText(/clientSecret não é permitido no navegador/i)
+    ).toBeInTheDocument();
+
+    warnSpy.mockRestore();
   });
 });

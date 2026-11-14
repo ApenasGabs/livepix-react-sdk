@@ -1,17 +1,23 @@
-import { getEnv } from "../utils/env";
+import {
+  getEnv,
+  isBrowserRuntime,
+  warnBrowserSecretExposure,
+} from "../utils/env";
 
 /**
- * Configuração centralizada do SDK LivePix
- * Esse objeto contém todas as configurações necessárias para o funcionamento do SDK
- * independentemente do ambiente ou prefixo das variáveis de ambiente.
+ * Configuração centralizada do SDK LivePix (Arquitetura Dual Server/Client)
+ * - Server-Side (Node.js / BFF): suporta `LIVEPIX_CLIENT_ID` e `LIVEPIX_CLIENT_SECRET`
+ * - Client-Side (React / Browser): opera via BFF (`paymentEndpoint` / `proxyUrl`) ou link público (`username` / `redirectUrl`)
+ *   sem nunca exigir ou expor `clientSecret`.
  */
 export const CONFIG = {
-  // API e Autenticação
+  // API e Autenticação (Server-Side OAuth2)
   auth: {
     clientId: () => getClientId(),
     clientSecret: () => getClientSecret(),
     tokenUrl: () => {
-      const customUrl = getEnv("VITE_LIVEPIX_TOKEN_URL");
+      const customUrl =
+        getEnv("VITE_LIVEPIX_TOKEN_URL") || getEnv("LIVEPIX_TOKEN_URL");
       if (customUrl) {
         return customUrl;
       }
@@ -24,7 +30,10 @@ export const CONFIG = {
     scope: () =>
       getEnv(
         "VITE_LIVEPIX_SCOPE",
-        "payments:read payments:write offline account:read currencies:read rewards:read rewards:write messages:read messages:write subscriptions:read subscriptions:write subscription-plans:read subscription-plans:write wallet:read webhooks controls"
+        getEnv(
+          "LIVEPIX_SCOPE",
+          "payments:read payments:write offline account:read currencies:read rewards:read rewards:write messages:read messages:write subscriptions:read subscriptions:write subscription-plans:read subscription-plans:write wallet:read webhooks controls"
+        )
       ),
   },
 
@@ -35,15 +44,49 @@ export const CONFIG = {
       if (isLocalDevelopment()) {
         return "/api";
       }
-      return getEnv("VITE_LIVEPIX_API_URL", "https://api.livepix.gg");
+      return getEnv(
+        "VITE_LIVEPIX_API_URL",
+        getEnv("LIVEPIX_API_URL", "https://api.livepix.gg")
+      );
     },
+  },
+
+  // Configurações seguras para Client-Side (React / Browser)
+  client: {
+    paymentEndpoint: () =>
+      getEnv(
+        "VITE_LIVEPIX_PAYMENT_ENDPOINT",
+        getEnv("REACT_APP_LIVEPIX_PAYMENT_ENDPOINT", "")
+      ),
+    proxyUrl: () =>
+      getEnv(
+        "VITE_LIVEPIX_PROXY_URL",
+        getEnv("REACT_APP_LIVEPIX_PROXY_URL", "")
+      ),
+    username: () =>
+      getEnv(
+        "VITE_LIVEPIX_USERNAME",
+        getEnv("REACT_APP_LIVEPIX_USERNAME", "")
+      ),
   },
 
   // Configurações de pagamento padrão
   payment: {
-    defaultCurrency: () => getEnv("VITE_LIVEPIX_DEFAULT_CURRENCY", "BRL"),
-    defaultRedirectUrl: () =>
-      getEnv("VITE_LIVEPIX_DEFAULT_REDIRECT_URL", window.location.href),
+    defaultCurrency: () =>
+      getEnv(
+        "VITE_LIVEPIX_DEFAULT_CURRENCY",
+        getEnv("LIVEPIX_DEFAULT_CURRENCY", "BRL")
+      ),
+    defaultRedirectUrl: () => {
+      const browserHref =
+        typeof window !== "undefined" && window.location
+          ? window.location.href
+          : "";
+      return getEnv(
+        "VITE_LIVEPIX_DEFAULT_REDIRECT_URL",
+        getEnv("LIVEPIX_DEFAULT_REDIRECT_URL", browserHref)
+      );
+    },
   },
 };
 
@@ -57,7 +100,7 @@ function isLocalDevelopment(): boolean {
   ) {
     return false;
   }
-  if (typeof window !== "undefined") {
+  if (typeof window !== "undefined" && window.location) {
     const hostname = window.location.hostname;
     return hostname === "localhost" || hostname === "127.0.0.1";
   }
@@ -66,12 +109,16 @@ function isLocalDevelopment(): boolean {
 
 /**
  * Obtém o client ID da LivePix considerando diferentes variáveis de ambiente.
- * Ordem de prioridade:
- * 1. VITE_LIVEPIX_CLIENT_ID
- * 2. REACT_APP_LIVEPIX_CLIENT_ID
- * 3. LIVEPIX_CLIENT_ID
+ * No servidor (Node.js), prioriza `LIVEPIX_CLIENT_ID`.
  */
 export function getClientId(): string {
+  if (!isBrowserRuntime()) {
+    return (
+      getEnv("LIVEPIX_CLIENT_ID") ||
+      getEnv("VITE_LIVEPIX_CLIENT_ID") ||
+      getEnv("REACT_APP_LIVEPIX_CLIENT_ID", "")
+    );
+  }
   return (
     getEnv("VITE_LIVEPIX_CLIENT_ID") ||
     getEnv("REACT_APP_LIVEPIX_CLIENT_ID") ||
@@ -80,24 +127,43 @@ export function getClientId(): string {
 }
 
 /**
- * Obtém o client secret da LivePix considerando diferentes variáveis de ambiente.
- * Ordem de prioridade:
- * 1. VITE_LIVEPIX_CLIENT_SECRET
- * 2. REACT_APP_LIVEPIX_CLIENT_SECRET
- * 3. LIVEPIX_CLIENT_SECRET
+ * Obtém o client secret da LivePix exclusivamente em runtime Server-Side (Node.js).
+ * Em ambiente de navegador (`isBrowserRuntime()`), retorna sempre `""` e emite alerta
+ * caso variáveis `VITE_LIVEPIX_CLIENT_SECRET` ou `REACT_APP_LIVEPIX_CLIENT_SECRET` estejam definidas.
  */
 export function getClientSecret(): string {
-  return (
-    getEnv("VITE_LIVEPIX_CLIENT_SECRET") ||
-    getEnv("REACT_APP_LIVEPIX_CLIENT_SECRET") ||
-    getEnv("LIVEPIX_CLIENT_SECRET", "")
-  );
+  if (isBrowserRuntime()) {
+    if (
+      typeof process !== "undefined" &&
+      process.env &&
+      (process.env.VITE_LIVEPIX_CLIENT_SECRET ||
+        process.env.REACT_APP_LIVEPIX_CLIENT_SECRET ||
+        process.env.LIVEPIX_CLIENT_SECRET)
+    ) {
+      warnBrowserSecretExposure("getClientSecret");
+    } else {
+      getEnv("VITE_LIVEPIX_CLIENT_SECRET");
+      getEnv("REACT_APP_LIVEPIX_CLIENT_SECRET");
+    }
+    return "";
+  }
+  return getEnv("LIVEPIX_CLIENT_SECRET", "");
 }
 
 /**
- * Verifica se o SDK tem credenciais válidas para acessar a API
+ * Verifica se o SDK tem credenciais/configuração válidas para o runtime atual:
+ * - No servidor (Node.js): exige `clientId` e `clientSecret` válidos.
+ * - No navegador (React): verifica se há `paymentEndpoint`, `proxyUrl` ou `username` configurados.
  */
 export function hasValidCredentials(): boolean {
+  if (isBrowserRuntime()) {
+    return Boolean(
+      CONFIG.client.paymentEndpoint() ||
+        CONFIG.client.proxyUrl() ||
+        CONFIG.client.username()
+    );
+  }
+
   const clientId = getClientId();
   const clientSecret = getClientSecret();
 

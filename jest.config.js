@@ -1,6 +1,9 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'jsdom',
+  testEnvironmentOptions: {
+    url: 'https://app.example.com/donate',
+  },
   moduleNameMapper: {
     '^.+\\.svg$': '<rootDir>/src/__mocks__/svgMock.js',
     '^.+\\.css$': '<rootDir>/src/__mocks__/styleMock.js'
