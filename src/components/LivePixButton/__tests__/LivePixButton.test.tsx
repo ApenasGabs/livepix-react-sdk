@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axios from "axios";
 import LivePixButton from "../index";
@@ -63,7 +63,9 @@ describe("LivePixButton (Dual Server/Client Security Architecture)", () => {
       />
     );
 
-    await userEvent.click(screen.getByRole("button"));
+    await act(async () => {
+      await userEvent.click(screen.getByRole("button"));
+    });
 
     expect(mockedAxios.post).toHaveBeenCalledWith("/api/livepix/payments", {
       amount: 1500,
@@ -85,7 +87,9 @@ describe("LivePixButton (Dual Server/Client Security Architecture)", () => {
 
     render(<LivePixButton proxyUrl="/api/livepix" amount={2000} />);
 
-    await userEvent.click(screen.getByRole("button"));
+    await act(async () => {
+      await userEvent.click(screen.getByRole("button"));
+    });
 
     expect(mockedAxios.post).toHaveBeenCalledWith("/api/livepix/payments", {
       amount: 2000,
@@ -98,7 +102,9 @@ describe("LivePixButton (Dual Server/Client Security Architecture)", () => {
   it("redirects to public creator page when username is provided", async () => {
     render(<LivePixButton username="@apenasgabs" />);
 
-    await userEvent.click(screen.getByRole("button"));
+    await act(async () => {
+      await userEvent.click(screen.getByRole("button"));
+    });
 
     expect(window.location.href).toBe("https://livepix.gg/apenasgabs");
   });
@@ -118,7 +124,9 @@ describe("LivePixButton (Dual Server/Client Security Architecture)", () => {
       expect.stringContaining("[LivePix Security Warning]")
     );
 
-    await userEvent.click(screen.getByRole("button"));
+    await act(async () => {
+      await userEvent.click(screen.getByRole("button"));
+    });
 
     expect(
       screen.getByText(/clientSecret não é permitido no navegador/i)
