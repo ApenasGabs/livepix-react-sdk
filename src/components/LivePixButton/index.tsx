@@ -1,32 +1,34 @@
 import React, { useState } from "react";
-import { createLivePix } from "../../api/livePix";
-import { CONFIG } from "../../config";
+import useLivePix from "../../hooks/useLivePix";
 import { LivePixButtonProps } from "../../types";
+import { assertSafeRedirectUrl } from "../../utils/url";
 
 const LivePixButton: React.FC<LivePixButtonProps> = ({
   label = "Doar",
   amount = 1000, // R$10,00 em centavos
   currency = "BRL",
-  redirectUrl = window.location.href,
+  redirectUrl,
   onClick,
   disabled = false,
+  paymentEndpoint,
+  proxyUrl,
+  username,
   clientId,
   clientSecret,
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Usar as credenciais fornecidas como prop ou obter da configuração centralizada
-  const effectiveClientId = clientId || CONFIG.auth.clientId();
-  const effectiveClientSecret = clientSecret || CONFIG.auth.clientSecret();
+  const { livePix, createPayment, error: sdkError } = useLivePix({
+    paymentEndpoint,
+    proxyUrl,
+    username,
+    redirectUrl,
+    clientId,
+    clientSecret,
+  });
 
-  // Usar a função centralizada para verificar credenciais
-  const credentialsAvailable = Boolean(
-    effectiveClientId &&
-      effectiveClientSecret &&
-      effectiveClientId !== "seu-client-id" &&
-      effectiveClientSecret !== "seu-client-secret"
-  );
+  const isConfigured = Boolean(livePix || onClick);
 
   const handleClick = async () => {
     if (onClick) {
@@ -34,14 +36,11 @@ const LivePixButton: React.FC<LivePixButtonProps> = ({
       return;
     }
 
-    if (!credentialsAvailable) {
+    if (!isConfigured) {
       setError(
-        "Credenciais da API não configuradas. Forneça clientId e clientSecret."
+        sdkError?.message ||
+          "Configuração de doação ausente. Forneça paymentEndpoint, proxyUrl, username ou redirectUrl."
       );
-      console.error("LivePixButton: Credenciais não configuradas", {
-        clientIdAvailable: Boolean(effectiveClientId),
-        clientSecretAvailable: Boolean(effectiveClientSecret),
-      });
       return;
     }
 
@@ -49,22 +48,9 @@ const LivePixButton: React.FC<LivePixButtonProps> = ({
     setError(null);
 
     try {
-      const sdk = createLivePix(
-        effectiveClientId as string,
-        effectiveClientSecret as string
-      );
-
-      const payment = await sdk.payments.createPayment(
-        amount,
-        currency,
-        redirectUrl
-      );
-
-      if (payment.redirectUrl) {
-        window.location.href = payment.redirectUrl;
-      } else {
-        throw new Error("URL de redirecionamento não retornada pelo servidor");
-      }
+      const payment = await createPayment(amount, currency, redirectUrl);
+      const safeRedirectUrl = assertSafeRedirectUrl(payment.redirectUrl);
+      window.location.href = safeRedirectUrl;
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Erro ao processar pagamento";
@@ -83,7 +69,7 @@ const LivePixButton: React.FC<LivePixButtonProps> = ({
     padding: "10px 20px",
     fontSize: "16px",
     cursor: disabled || loading ? "not-allowed" : "pointer",
-    opacity: disabled || loading || !credentialsAvailable ? 0.7 : 1,
+    opacity: disabled || loading || !isConfigured ? 0.7 : 1,
   };
 
   const errorStyle = {
@@ -105,17 +91,18 @@ const LivePixButton: React.FC<LivePixButtonProps> = ({
         onClick={handleClick}
         disabled={disabled || loading}
         title={
-          !credentialsAvailable
-            ? "Faltando configuração de credenciais da API"
+          !isConfigured
+            ? "Faltando configuração de endpoint BFF ou link público"
             : undefined
         }
       >
         {loading ? "Processando..." : label}
       </button>
 
-      {!credentialsAvailable && !error && (
+      {!isConfigured && !error && (
         <div style={infoStyle}>
-          ⚠️ Credenciais da API não configuradas. O botão não funcionará.
+          ⚠️ Credenciais da API não configuradas. Configure paymentEndpoint,
+          proxyUrl, username ou redirectUrl.
         </div>
       )}
 

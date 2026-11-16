@@ -1,4 +1,5 @@
 import { CONFIG } from "../config";
+import { isBrowserRuntime, warnBrowserSecretExposure } from "../utils/env";
 import { ApiClientConfig, createApiClient } from "./apiClient";
 import { createAccountApi } from "./modules/account";
 import { createCurrenciesApi } from "./modules/currencies";
@@ -34,15 +35,19 @@ export const createLivePix = (
   clientSecretParam?: string,
   options: LivePixSDKOptions = {}
 ): LivePixSDK => {
-  // Usar as credenciais fornecidas ou obter da configuração centralizada
+  // Usar as credenciais fornecidas ou obter da configuração centralizada (Server-Side)
   const clientId = clientIdParam || options.clientId || CONFIG.auth.clientId();
   const clientSecret =
     clientSecretParam || options.clientSecret || CONFIG.auth.clientSecret();
 
+  if (isBrowserRuntime()) {
+    warnBrowserSecretExposure("createLivePix");
+  }
+
   // Validar credenciais
   if (!clientId || !clientSecret) {
     throw new Error(
-      "Credenciais da API não configuradas. Forneça clientId e clientSecret."
+      "Credenciais da API não configuradas para uso Server-Side. Defina LIVEPIX_CLIENT_ID e LIVEPIX_CLIENT_SECRET no servidor (Node.js / BFF)."
     );
   }
 

@@ -58,23 +58,61 @@ export interface WebhookData {
   url: string;
 }
 
-export interface LivePixButtonProps {
+export interface LivePixClientConfig {
+  redirectUrl?: string;
+  /**
+   * Endpoint BFF (Backend-For-Frontend) para criação segura de pagamento no servidor (POST)
+   * Ex: "/api/livepix/payments"
+   */
+  paymentEndpoint?: string;
+  /**
+   * URL base de proxy/BFF para chamadas seguras ao backend próprio (ex: "/api/livepix")
+   */
+  proxyUrl?: string;
+  /**
+   * Nome de usuário público do criador na LivePix (ex: "apenasgabs" -> https://livepix.gg/apenasgabs)
+   */
+  username?: string;
+  /**
+   * ID público do cliente (opcional)
+   */
+  clientId?: string;
+  /**
+   * @deprecated Nunca passe `clientSecret` no frontend React. Use `paymentEndpoint`, `proxyUrl`, `username` ou `redirectUrl`.
+   */
+  clientSecret?: string;
+}
+
+export interface LivePixButtonProps extends LivePixClientConfig {
   onClick?: () => void;
   label?: string;
   amount?: number;
   currency?: string;
-  redirectUrl?: string;
   disabled?: boolean;
-  clientId?: string;
-  clientSecret?: string;
 }
 
-export interface UseLivePixConfig {
-  clientId: string;
-  clientSecret: string;
+export type UseLivePixConfig = LivePixClientConfig;
+
+export interface LivePixClientSDK {
+  mode: "bff" | "public";
+  payments: {
+    createPayment: (
+      amount?: number,
+      currency?: string,
+      redirectUrl?: string
+    ) => Promise<PaymentData>;
+  };
+  getPublicUrl: () => string | null;
 }
+
 export interface UseLivePixReturn {
-  livePix: unknown; // FIXME - Substituir pelo tipo correto do LivePixSDK
+  livePix: LivePixClientSDK | null;
+  createPayment: (
+    amount?: number,
+    currency?: string,
+    redirectUrl?: string
+  ) => Promise<PaymentData>;
+  getPublicUrl: () => string | null;
   loading: boolean;
   error: Error | null;
 }

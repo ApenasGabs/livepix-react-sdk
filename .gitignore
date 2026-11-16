@@ -25,3 +25,5 @@ dist-ssr
 sdk-model/*
 livepix-react-sdk/*
 .vercel
+coverage
+.agents

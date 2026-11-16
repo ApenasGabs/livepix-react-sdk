@@ -1,6 +1,7 @@
 import axios from "axios";
 import { CONFIG } from "../config";
 import { OAuthTokenResponse } from "../types";
+import { isBrowserRuntime, warnBrowserSecretExposure } from "../utils/env";
 
 export type RequestFn<T> = (token: string) => Promise<T>;
 
@@ -46,6 +47,10 @@ export const createApiClient = (config: ApiClientConfig): ApiClient => {
     tokenUrl = CONFIG.auth.tokenUrl(),
     baseUrl = CONFIG.api.baseUrl(),
   } = config;
+
+  if (isBrowserRuntime() && clientSecret) {
+    warnBrowserSecretExposure("createApiClient");
+  }
 
   // Estado interno (encapsulado no closure)
   let accessToken: string | null = null;
