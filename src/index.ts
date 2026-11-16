@@ -11,15 +11,18 @@ export { createWebhookApi } from "./api/modules/webhooks";
 export { default as LivePixButton } from "./components/LivePixButton";
 
 // Hooks e helpers de cliente
+export { default as useLivePix } from "./hooks/useLivePix";
 export {
+  assertSafeRedirectUrl,
   buildPublicDonationUrl,
-  default as useLivePix,
+  isSafeHttpUrl,
   resolveBffPaymentEndpoint,
-} from "./hooks/useLivePix";
+} from "./utils/url";
 
 // Utilitários
 export {
   getEnv,
+  hasBrowserSecretExposure,
   isBrowserRuntime,
   isSecretEnvKey,
   isServerRuntime,

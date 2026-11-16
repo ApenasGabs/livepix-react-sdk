@@ -1,13 +1,7 @@
-import axios from "axios";
-import React, { useEffect, useState } from "react";
-import { unwrapResponse } from "../../api/apiClient";
-import { CONFIG } from "../../config";
-import {
-  buildPublicDonationUrl,
-  resolveBffPaymentEndpoint,
-} from "../../hooks/useLivePix";
-import { LivePixButtonProps, PaymentData } from "../../types";
-import { warnBrowserSecretExposure } from "../../utils/env";
+import React, { useState } from "react";
+import useLivePix from "../../hooks/useLivePix";
+import { LivePixButtonProps } from "../../types";
+import { assertSafeRedirectUrl } from "../../utils/url";
 
 const LivePixButton: React.FC<LivePixButtonProps> = ({
   label = "Doar",
@@ -19,33 +13,22 @@ const LivePixButton: React.FC<LivePixButtonProps> = ({
   paymentEndpoint,
   proxyUrl,
   username,
+  clientId,
   clientSecret,
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const hasClientSecretProp = Boolean(clientSecret);
+  const { livePix, createPayment, error: sdkError } = useLivePix({
+    paymentEndpoint,
+    proxyUrl,
+    username,
+    redirectUrl,
+    clientId,
+    clientSecret,
+  });
 
-  useEffect(() => {
-    if (hasClientSecretProp) {
-      warnBrowserSecretExposure("LivePixButton");
-    }
-  }, [hasClientSecretProp]);
-
-  const bffEndpoint = resolveBffPaymentEndpoint(
-    paymentEndpoint || CONFIG.client.paymentEndpoint(),
-    proxyUrl || CONFIG.client.proxyUrl()
-  );
-
-  const effectiveUsername = username || CONFIG.client.username();
-
-  // Se clientSecret foi passado indevidamente sem BFF/username, redirectUrl não deve ser assumido como link público
-  const publicUrl = buildPublicDonationUrl(
-    effectiveUsername,
-    hasClientSecretProp ? undefined : redirectUrl
-  );
-
-  const isConfigured = Boolean(bffEndpoint || publicUrl || onClick);
+  const isConfigured = Boolean(livePix || onClick);
 
   const handleClick = async () => {
     if (onClick) {
@@ -53,17 +36,10 @@ const LivePixButton: React.FC<LivePixButtonProps> = ({
       return;
     }
 
-    if (hasClientSecretProp && !bffEndpoint && !effectiveUsername) {
-      warnBrowserSecretExposure("LivePixButton");
-      setError(
-        "Segurança: clientSecret não é permitido no navegador. Configure paymentEndpoint, proxyUrl, username ou redirectUrl."
-      );
-      return;
-    }
-
     if (!isConfigured) {
       setError(
-        "Configuração de doação ausente. Forneça paymentEndpoint, proxyUrl, username ou redirectUrl."
+        sdkError?.message ||
+          "Configuração de doação ausente. Forneça paymentEndpoint, proxyUrl, username ou redirectUrl."
       );
       return;
     }
@@ -72,30 +48,9 @@ const LivePixButton: React.FC<LivePixButtonProps> = ({
     setError(null);
 
     try {
-      if (bffEndpoint) {
-        const targetRedirectUrl =
-          redirectUrl || CONFIG.payment.defaultRedirectUrl();
-
-        const response = await axios.post(bffEndpoint, {
-          amount,
-          currency,
-          redirectUrl: targetRedirectUrl,
-        });
-
-        const payment = unwrapResponse<PaymentData>(response);
-
-        if (payment?.redirectUrl) {
-          window.location.href = payment.redirectUrl;
-        } else {
-          throw new Error("URL de redirecionamento não retornada pelo servidor");
-        }
-        return;
-      }
-
-      if (publicUrl) {
-        window.location.href = publicUrl;
-        return;
-      }
+      const payment = await createPayment(amount, currency, redirectUrl);
+      const safeRedirectUrl = assertSafeRedirectUrl(payment.redirectUrl);
+      window.location.href = safeRedirectUrl;
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Erro ao processar pagamento";

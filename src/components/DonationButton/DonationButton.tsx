@@ -1,32 +1,31 @@
-import { useState } from "react";
-import { createLivePix } from "../../api/livePix";
+import React, { useState } from "react";
 import { CONFIG } from "../../config";
+import useLivePix from "../../hooks/useLivePix";
+import { LivePixClientConfig } from "../../types";
+import { assertSafeRedirectUrl } from "../../utils/url";
 
-const DonationButton = () => {
+export type DonationButtonProps = Partial<LivePixClientConfig>;
+
+const DonationButton: React.FC<DonationButtonProps> = (props) => {
   const [amount, setAmount] = useState(1000); // Valor padrão R$10,00 em centavos
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { createPayment } = useLivePix(props);
 
   const handleDonation = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      // Usar nosso SDK funcional com as configurações centralizadas
-      const livePix = createLivePix(
-        CONFIG.auth.clientId(),
-        CONFIG.auth.clientSecret()
-      );
-
-      const payment = await livePix.payments.createPayment(
+      const payment = await createPayment(
         amount,
         CONFIG.payment.defaultCurrency(),
-        CONFIG.payment.defaultRedirectUrl()
+        props.redirectUrl || CONFIG.payment.defaultRedirectUrl()
       );
 
-      // Redirecionar para o URL de pagamento
+      // Redirecionar para o URL de pagamento após validar protocolo HTTP(S)
       if (payment.redirectUrl) {
-        window.location.href = payment.redirectUrl;
+        window.location.href = assertSafeRedirectUrl(payment.redirectUrl);
       }
     } catch (err) {
       setError("Falha ao processar doação. Por favor, tente novamente.");

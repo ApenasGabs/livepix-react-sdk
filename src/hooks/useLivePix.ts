@@ -9,43 +9,18 @@ import {
   UseLivePixReturn,
 } from "../types";
 import { warnBrowserSecretExposure } from "../utils/env";
+import {
+  assertSafeRedirectUrl,
+  buildPublicDonationUrl,
+  isSafeHttpUrl,
+  resolveBffPaymentEndpoint,
+} from "../utils/url";
 
-/**
- * Resolve o endpoint BFF de criação de pagamentos a partir de `paymentEndpoint` ou `proxyUrl`.
- */
-export const resolveBffPaymentEndpoint = (
-  paymentEndpoint?: string,
-  proxyUrl?: string
-): string => {
-  if (paymentEndpoint && paymentEndpoint.trim()) {
-    return paymentEndpoint.trim();
-  }
-  if (proxyUrl && proxyUrl.trim()) {
-    const cleanProxy = proxyUrl.trim().replace(/\/+$/, "");
-    return cleanProxy.endsWith("/payments")
-      ? cleanProxy
-      : `${cleanProxy}/payments`;
-  }
-  return "";
-};
-
-/**
- * Constrói a URL pública de doação a partir do `username` do criador ou `redirectUrl` pré-gerada.
- */
-export const buildPublicDonationUrl = (
-  username?: string,
-  redirectUrl?: string
-): string => {
-  if (username && username.trim()) {
-    const cleanUsername = username.trim().replace(/^@+/, "");
-    if (cleanUsername) {
-      return `https://livepix.gg/${encodeURIComponent(cleanUsername)}`;
-    }
-  }
-  if (redirectUrl && redirectUrl.trim()) {
-    return redirectUrl.trim();
-  }
-  return "";
+export {
+  assertSafeRedirectUrl,
+  buildPublicDonationUrl,
+  isSafeHttpUrl,
+  resolveBffPaymentEndpoint,
 };
 
 const useLivePix = (config?: Partial<UseLivePixConfig>): UseLivePixReturn => {
@@ -101,12 +76,17 @@ const useLivePix = (config?: Partial<UseLivePixConfig>): UseLivePixReturn => {
         if (!payload?.redirectUrl) {
           throw new Error("URL de redirecionamento não retornada pelo servidor");
         }
-        return payload;
+        const safeRedirectUrl = assertSafeRedirectUrl(payload.redirectUrl);
+        return {
+          ...payload,
+          redirectUrl: safeRedirectUrl,
+        };
       }
 
       if (publicUrl) {
+        const safePublicUrl = assertSafeRedirectUrl(publicUrl);
         return {
-          redirectUrl: publicUrl,
+          redirectUrl: safePublicUrl,
           reference: effectiveUsername || "public_redirect",
         };
       }
@@ -125,7 +105,7 @@ const useLivePix = (config?: Partial<UseLivePixConfig>): UseLivePixReturn => {
 
     if (!bffEndpoint && !publicUrl) {
       const message = hasClientSecretProp
-        ? "Segurança: clientSecret não é permitido no frontend React. Configure paymentEndpoint, proxyUrl, username ou redirectUrl."
+        ? "Segurança: clientSecret não é permitido no navegador (frontend React). Configure paymentEndpoint, proxyUrl, username ou redirectUrl."
         : "Configuração do LivePix não encontrada. Forneça paymentEndpoint, proxyUrl, username ou redirectUrl.";
       setLivePix(null);
       setError(new Error(message));

@@ -2,7 +2,9 @@ import { renderHook } from "@testing-library/react";
 import axios from "axios";
 import { getClientId, getClientSecret } from "../../config";
 import useLivePix, {
+  assertSafeRedirectUrl,
   buildPublicDonationUrl,
+  isSafeHttpUrl,
   resolveBffPaymentEndpoint,
 } from "../useLivePix";
 
@@ -52,6 +54,33 @@ describe("useLivePix & Dual Runtime Security", () => {
       expect(getClientId()).toBe("server_client_id");
       expect(getClientSecret()).toBe("server_client_secret");
     });
+
+    it("does not fall back to LIVEPIX_CLIENT_ID in browser runtime", () => {
+      const globalWithImportMeta = globalThis as typeof globalThis & {
+        import?: { meta?: { env?: Record<string, string | undefined> } };
+      };
+      const prevViteClientId =
+        globalWithImportMeta.import?.meta?.env?.VITE_LIVEPIX_CLIENT_ID;
+      if (globalWithImportMeta.import?.meta?.env) {
+        delete globalWithImportMeta.import.meta.env.VITE_LIVEPIX_CLIENT_ID;
+      }
+      delete process.env.VITE_LIVEPIX_CLIENT_ID;
+      delete process.env.REACT_APP_LIVEPIX_CLIENT_ID;
+      process.env.LIVEPIX_CLIENT_ID = "server_only_client_id";
+      (globalThis as GlobalWithRuntime).__LIVEPIX_RUNTIME__ = "browser";
+
+      try {
+        expect(getClientId()).toBe("");
+      } finally {
+        if (
+          globalWithImportMeta.import?.meta?.env &&
+          prevViteClientId !== undefined
+        ) {
+          globalWithImportMeta.import.meta.env.VITE_LIVEPIX_CLIENT_ID =
+            prevViteClientId;
+        }
+      }
+    });
   });
 
   describe("URL & Endpoint Helpers", () => {
@@ -72,6 +101,18 @@ describe("useLivePix & Dual Runtime Security", () => {
       expect(
         buildPublicDonationUrl(undefined, "https://livepix.gg/checkout/123")
       ).toBe("https://livepix.gg/checkout/123");
+      expect(
+        buildPublicDonationUrl(undefined, "javascript:alert(1)")
+      ).toBe("");
+      expect(isSafeHttpUrl("https://livepix.gg/checkout/123")).toBe(true);
+      expect(isSafeHttpUrl("http://localhost:3000/pay")).toBe(true);
+      expect(isSafeHttpUrl("javascript:alert(1)")).toBe(false);
+      expect(isSafeHttpUrl("data:text/html,<script>alert(1)</script>")).toBe(
+        false
+      );
+      expect(() => assertSafeRedirectUrl("javascript:alert(1)")).toThrow(
+        /protocolo de url de redirecionamento não permitido/i
+      );
     });
   });
 
@@ -144,6 +185,23 @@ describe("useLivePix & Dual Runtime Security", () => {
       expect(result.current.error?.message).toMatch(/clientSecret não é permitido/i);
 
       warnSpy.mockRestore();
+    });
+
+    it("rejects unsafe non-HTTP(S) redirectUrl returned by BFF", async () => {
+      mockedAxios.post.mockResolvedValueOnce({
+        data: {
+          redirectUrl: "javascript:alert('xss')",
+          reference: "ref_xss",
+        },
+      });
+
+      const { result } = renderHook(() =>
+        useLivePix({ paymentEndpoint: "/api/livepix/payments" })
+      );
+
+      await expect(result.current.createPayment(1500)).rejects.toThrow(
+        /protocolo de url de redirecionamento não permitido/i
+      );
     });
   });
 });

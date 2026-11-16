@@ -134,4 +134,27 @@ describe("LivePixButton (Dual Server/Client Security Architecture)", () => {
 
     warnSpy.mockRestore();
   });
+
+  it("blocks redirect when BFF returns non-HTTP(S) redirectUrl", async () => {
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    mockedAxios.post.mockResolvedValueOnce({
+      data: {
+        redirectUrl: "javascript:alert(document.cookie)",
+        reference: "ref_unsafe",
+      },
+    });
+
+    render(<LivePixButton paymentEndpoint="/api/livepix/payments" />);
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole("button"));
+    });
+
+    expect(window.location.href).toBe("https://app.example.com/donate");
+    expect(
+      screen.getByText(/protocolo de url de redirecionamento não permitido/i)
+    ).toBeInTheDocument();
+
+    errorSpy.mockRestore();
+  });
 });

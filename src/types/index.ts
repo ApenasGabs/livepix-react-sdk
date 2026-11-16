@@ -58,13 +58,8 @@ export interface WebhookData {
   url: string;
 }
 
-export interface LivePixButtonProps {
-  onClick?: () => void;
-  label?: string;
-  amount?: number;
-  currency?: string;
+export interface LivePixClientConfig {
   redirectUrl?: string;
-  disabled?: boolean;
   /**
    * Endpoint BFF (Backend-For-Frontend) para criação segura de pagamento no servidor (POST)
    * Ex: "/api/livepix/payments"
@@ -88,17 +83,15 @@ export interface LivePixButtonProps {
   clientSecret?: string;
 }
 
-export interface UseLivePixConfig {
-  paymentEndpoint?: string;
-  proxyUrl?: string;
-  username?: string;
-  redirectUrl?: string;
-  clientId?: string;
-  /**
-   * @deprecated Nunca passe `clientSecret` no frontend React. Use `paymentEndpoint`, `proxyUrl`, `username` ou `redirectUrl`.
-   */
-  clientSecret?: string;
+export interface LivePixButtonProps extends LivePixClientConfig {
+  onClick?: () => void;
+  label?: string;
+  amount?: number;
+  currency?: string;
+  disabled?: boolean;
 }
+
+export type UseLivePixConfig = LivePixClientConfig;
 
 export interface LivePixClientSDK {
   mode: "bff" | "public";

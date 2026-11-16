@@ -62,6 +62,35 @@ export const warnBrowserSecretExposure = (source: string = "LivePix SDK"): void 
   );
 };
 
+const hasExposedSecretInRecord = (
+  envObj?: Record<string, string | undefined>
+): boolean => {
+  if (!envObj) {
+    return false;
+  }
+  return Object.keys(envObj).some(
+    (envKey) => isSecretEnvKey(envKey) && Boolean(envObj[envKey])
+  );
+};
+
+/**
+ * Verifica dinamicamente se alguma chave secreta foi exposta no runtime de navegador,
+ * evitando referências estáticas que bundlers possam substituir em tempo de build.
+ */
+export const hasBrowserSecretExposure = (): boolean => {
+  if (!isBrowserRuntime()) {
+    return false;
+  }
+  const metaEnv = getImportMetaEnv();
+  const processEnv =
+    typeof process !== "undefined" && process.env
+      ? (process.env as Record<string, string | undefined>)
+      : undefined;
+  return (
+    hasExposedSecretInRecord(metaEnv) || hasExposedSecretInRecord(processEnv)
+  );
+};
+
 export const getEnv = (key: string, defaultValue: string = ""): string => {
   const inBrowser = isBrowserRuntime();
   const isSecret = isSecretEnvKey(key);
@@ -69,21 +98,16 @@ export const getEnv = (key: string, defaultValue: string = ""): string => {
 
   // Bloqueio de segurança: nunca ler ou expor clientSecret em ambiente de navegador
   if (isSecret && inBrowser) {
-    const hasMetaSecret = Boolean(
-      metaEnv &&
-        (metaEnv[key] ||
-          metaEnv["VITE_LIVEPIX_CLIENT_SECRET"] ||
-          metaEnv["REACT_APP_LIVEPIX_CLIENT_SECRET"])
-    );
-    const hasProcessSecret = Boolean(
-      typeof process !== "undefined" &&
-        process.env &&
-        (process.env[key] ||
-          process.env["VITE_LIVEPIX_CLIENT_SECRET"] ||
-          process.env["REACT_APP_LIVEPIX_CLIENT_SECRET"])
+    const hasDirectMetaSecret = Boolean(metaEnv && metaEnv[key]);
+    const hasDirectProcessSecret = Boolean(
+      typeof process !== "undefined" && process.env && process.env[key]
     );
 
-    if (hasMetaSecret || hasProcessSecret) {
+    if (
+      hasDirectMetaSecret ||
+      hasDirectProcessSecret ||
+      hasBrowserSecretExposure()
+    ) {
       warnBrowserSecretExposure(key);
     }
     return defaultValue;
@@ -139,9 +163,11 @@ export const getEnv = (key: string, defaultValue: string = ""): string => {
       if (process.env[reactAppKey]) {
         return process.env[reactAppKey] || defaultValue;
       }
-      const serverKey = key.replace(/^VITE_/, "");
-      if (process.env[serverKey]) {
-        return process.env[serverKey] || defaultValue;
+      if (!inBrowser) {
+        const serverKey = key.replace(/^VITE_/, "");
+        if (process.env[serverKey]) {
+          return process.env[serverKey] || defaultValue;
+        }
       }
     }
 
@@ -150,9 +176,11 @@ export const getEnv = (key: string, defaultValue: string = ""): string => {
       if (process.env[viteKey]) {
         return process.env[viteKey] || defaultValue;
       }
-      const serverKey = key.replace(/^REACT_APP_/, "");
-      if (process.env[serverKey]) {
-        return process.env[serverKey] || defaultValue;
+      if (!inBrowser) {
+        const serverKey = key.replace(/^REACT_APP_/, "");
+        if (process.env[serverKey]) {
+          return process.env[serverKey] || defaultValue;
+        }
       }
     }
   }
