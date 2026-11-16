@@ -2,8 +2,20 @@ import { CONFIG } from "../config";
 import { isBrowserRuntime, warnBrowserSecretExposure } from "../utils/env";
 import { ApiClientConfig, createApiClient } from "./apiClient";
 import { createAccountApi } from "./modules/account";
+import { AlertsAPI } from "./modules/alerts";
+import { ControlsAPI, createControlsApi } from "./modules/controls";
 import { createCurrenciesApi } from "./modules/currencies";
+import { createMessagesApi, MessagesAPI } from "./modules/messages";
 import { createPaymentApi } from "./modules/payments";
+import { createRewardsApi, RewardsAPI } from "./modules/rewards";
+import {
+  createSubscriptionPlansApi,
+  SubscriptionPlansAPI,
+} from "./modules/subscriptionPlans";
+import {
+  createSubscriptionsApi,
+  SubscriptionsAPI,
+} from "./modules/subscriptions";
 import { createWalletApi } from "./modules/wallet";
 import { createWebhookApi } from "./modules/webhooks";
 
@@ -21,6 +33,13 @@ export type LivePixSDK = {
   wallet: ReturnType<typeof createWalletApi>;
   webhooks: ReturnType<typeof createWebhookApi>;
   currencies: ReturnType<typeof createCurrenciesApi>;
+  messages: MessagesAPI;
+  subscriptions: SubscriptionsAPI;
+  subscriptionPlans: SubscriptionPlansAPI;
+  rewards: RewardsAPI;
+  controls: ControlsAPI;
+  /** Alias de compatibilidade para `controls` (`/v2/controls`). */
+  alerts: AlertsAPI;
 };
 
 /**
@@ -60,6 +79,7 @@ export const createLivePix = (
   };
 
   const apiClient = createApiClient(config);
+  const controls = createControlsApi(apiClient);
 
   return {
     account: createAccountApi(apiClient),
@@ -67,6 +87,12 @@ export const createLivePix = (
     wallet: createWalletApi(apiClient),
     webhooks: createWebhookApi(apiClient),
     currencies: createCurrenciesApi(apiClient),
+    messages: createMessagesApi(apiClient),
+    subscriptions: createSubscriptionsApi(apiClient),
+    subscriptionPlans: createSubscriptionPlansApi(apiClient),
+    rewards: createRewardsApi(apiClient),
+    controls,
+    alerts: controls,
   };
 };
 

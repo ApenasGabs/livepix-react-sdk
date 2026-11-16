@@ -1,11 +1,31 @@
 // SDK funcional
-export { createApiClient } from "./api/apiClient";
-export { createLivePix, initDefaultLivePix } from "./api/livePix";
-export { createAccountApi } from "./api/modules/account";
-export { createCurrenciesApi } from "./api/modules/currencies";
-export { createPaymentApi } from "./api/modules/payments";
-export { createWalletApi } from "./api/modules/wallet";
-export { createWebhookApi } from "./api/modules/webhooks";
+export { createApiClient, type ApiClient, type ApiClientConfig } from "./api/apiClient";
+export {
+  createLivePix,
+  initDefaultLivePix,
+  type LivePixSDK,
+  type LivePixSDKOptions,
+} from "./api/livePix";
+export { createAccountApi, type AccountAPI } from "./api/modules/account";
+export { createAlertsApi, type AlertsAPI } from "./api/modules/alerts";
+export { createControlsApi, type ControlsAPI } from "./api/modules/controls";
+export {
+  createCurrenciesApi,
+  type CurrenciesAPI,
+} from "./api/modules/currencies";
+export { createMessagesApi, type MessagesAPI } from "./api/modules/messages";
+export { createPaymentApi, type PaymentAPI } from "./api/modules/payments";
+export { createRewardsApi, type RewardsAPI } from "./api/modules/rewards";
+export {
+  createSubscriptionPlansApi,
+  type SubscriptionPlansAPI,
+} from "./api/modules/subscriptionPlans";
+export {
+  createSubscriptionsApi,
+  type SubscriptionsAPI,
+} from "./api/modules/subscriptions";
+export { createWalletApi, type WalletAPI } from "./api/modules/wallet";
+export { createWebhookApi, type WebhookAPI } from "./api/modules/webhooks";
 
 // Componentes
 export { default as LivePixButton } from "./components/LivePixButton";
