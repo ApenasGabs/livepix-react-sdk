@@ -70,3 +70,26 @@ export const buildPublicDonationUrl = (
   }
   return "";
 };
+
+export type QueryParamValue = string | number | boolean | undefined | null;
+
+/**
+ * Constrói um caminho de API com query string a partir de parâmetros opcionais,
+ * omitindo valores `undefined` ou `null`.
+ */
+export const buildQueryPath = <T extends object>(
+  basePath: string,
+  params?: T
+): string => {
+  if (!params) {
+    return basePath;
+  }
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null) {
+      searchParams.append(key, String(value));
+    }
+  }
+  const query = searchParams.toString();
+  return query ? `${basePath}?${query}` : basePath;
+};

@@ -58,6 +58,166 @@ export interface WebhookData {
   url: string;
 }
 
+export interface MessageData {
+  id: string;
+  proof: string;
+  reference: string;
+  username: string;
+  message: string;
+  amount: number;
+  currency: string;
+  flagged: boolean;
+  createdAt: string;
+}
+
+export interface GetMessagesParams {
+  proof?: string;
+  reference?: string;
+  currency?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface CreateMessageInput {
+  username: string;
+  message: string;
+  amount: number;
+  currency: string;
+  redirectUrl: string;
+}
+
+export interface CreateMessageData {
+  reference: string;
+  redirectUrl: string;
+}
+
+export interface SubscriptionPlanData {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  amount: number;
+  currency: string;
+  createdAt: string;
+}
+
+export interface GetSubscriptionPlansParams {
+  page?: number;
+  limit?: number;
+}
+
+export interface CreateSubscriptionPlanInput {
+  slug: string;
+  name: string;
+  description: string;
+  amount: number;
+  currency: string;
+}
+
+export interface CreatedSubscriptionPlanData {
+  id: string;
+}
+
+export interface UpdateSubscriptionPlanInput {
+  slug?: string;
+  name?: string;
+  description?: string;
+  amount?: number;
+}
+
+export type SubscriptionStatus = "active" | "pending" | "cancelled";
+
+export type SubscriptionRecurrence =
+  | "monthly"
+  | "quarterly"
+  | "semiannual"
+  | "yearly";
+
+export interface SubscriptionData {
+  id: string;
+  subscriber: string;
+  months: number;
+  currency: string;
+  amount: number;
+  recurrence: SubscriptionRecurrence;
+  status: SubscriptionStatus;
+  renewAt: string;
+  updatedAt: string;
+  createdAt: string;
+}
+
+export interface GetSubscriptionsParams {
+  status?: SubscriptionStatus;
+  currency?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface SubscriptionSubscriberInput {
+  username: string;
+  email: string;
+}
+
+export interface CreateSubscriptionInput {
+  planId: string;
+  recurrence: SubscriptionRecurrence;
+  subscriber: SubscriptionSubscriberInput;
+  redirectUrl: string;
+}
+
+export interface CreateSubscriptionData {
+  reference: string;
+  redirectUrl: string;
+}
+
+export interface GetSubscriptionTransactionsParams {
+  proof?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface SubscriptionTransactionData {
+  id: string;
+  proof: string;
+  amount: number;
+  createdAt: string;
+}
+
+export interface RewardData {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+  triggers: Record<string, unknown>[];
+  config: Record<string, unknown>;
+  amount: number;
+  status: string;
+  updatedAt: string;
+  createdAt: string;
+}
+
+export interface RewardGrantUser {
+  id: string;
+  username: string;
+}
+
+export interface RewardGrantData {
+  id: string;
+  user: RewardGrantUser;
+  data: Record<string, unknown>;
+  status: string;
+  updatedAt: string;
+  createdAt: string;
+}
+
+export interface ControlsData {
+  autoPlay: boolean;
+}
+
+export interface UpdateControlsInput {
+  autoPlay: boolean;
+}
+
 export interface LivePixClientConfig {
   redirectUrl?: string;
   /**
