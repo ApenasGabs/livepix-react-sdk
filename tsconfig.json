@@ -3,6 +3,7 @@
     "target": "es5",
     "module": "esnext",
     "composite": true,
+    "rootDir": "src",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,

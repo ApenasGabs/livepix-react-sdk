@@ -25,6 +25,7 @@ module.exports = {
       globals: {
         react: 'React',
         'react-dom': 'ReactDOM',
+        axios: 'axios',
       },
     },
   ],
@@ -34,8 +35,9 @@ module.exports = {
     commonjs(),
     typescript({
       tsconfig: './tsconfig.json',
+      outputToFilesystem: true,
     }),
     terser(),
   ],
-  external: ['react', 'react-dom'],
+  external: ['react', 'react-dom', 'axios'],
 };

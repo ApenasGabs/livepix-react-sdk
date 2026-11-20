@@ -27,3 +27,5 @@ livepix-react-sdk/*
 .vercel
 coverage
 .agents
+.rollup.cache
+*.tsbuildinfo
