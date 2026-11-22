@@ -14,7 +14,12 @@ module.exports = {
     'src/**/*.{ts,tsx}',
     '!src/**/*.d.ts',
     '!src/__mocks__/**',
-    '!src/types/**'
+    '!src/types/**',
+    '!src/api/index.ts',
+    '!src/components/index.ts',
+    '!src/hooks/index.ts',
+    '!src/utils/index.ts',
+    '!src/components/LivePixButton/styles.ts'
   ],
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
 };
