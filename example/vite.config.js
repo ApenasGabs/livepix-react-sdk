@@ -27,24 +27,58 @@ const assertNoBrowserSecrets = (env) => {
   }
 };
 
+class HttpError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
+
+const isValidHttpUrl = (value) => {
+  if (typeof value !== "string") {
+    return false;
+  }
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
 const readJsonBody = (req) =>
   new Promise((resolve, reject) => {
     let raw = "";
+    let settled = false;
     req.on("data", (chunk) => {
+      if (settled) return;
       raw += chunk;
       if (raw.length > 10_000) {
-        reject(new Error("Payload muito grande"));
-        req.destroy();
+        settled = true;
+        req.pause();
+        reject(new HttpError(413, "Payload muito grande"));
       }
     });
     req.on("end", () => {
+      if (settled) return;
+      settled = true;
       try {
-        resolve(raw ? JSON.parse(raw) : {});
+        const parsed = raw ? JSON.parse(raw) : {};
+        if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+          reject(new HttpError(400, "Corpo da requisição deve ser um objeto JSON"));
+          return;
+        }
+        resolve(parsed);
       } catch {
-        reject(new Error("JSON inválido"));
+        reject(new HttpError(400, "JSON inválido"));
       }
     });
-    req.on("error", reject);
+    req.on("error", (err) => {
+      if (!settled) {
+        settled = true;
+        reject(err);
+      }
+    });
   });
 
 const sendJson = (res, status, body) => {
@@ -134,23 +168,43 @@ const livePixDevBff = (env) => {
                 "BFF sem credenciais. Defina LIVEPIX_CLIENT_ID e LIVEPIX_CLIENT_SECRET (sem prefixo VITE_) em example/.env.local.",
             });
           }
+          let requestBody;
           try {
-            const { amount, currency = "BRL", redirectUrl } = await readJsonBody(req);
-            const parsedAmount = Number(amount);
-            if (!Number.isInteger(parsedAmount) || parsedAmount <= 0) {
-              return sendJson(res, 400, { error: "amount deve ser inteiro positivo (centavos)" });
+            requestBody = await readJsonBody(req);
+          } catch (err) {
+            if (err instanceof HttpError) {
+              if (err.status === 413) {
+                res.setHeader("Connection", "close");
+              }
+              return sendJson(res, err.status, { error: err.message });
             }
-            if (redirectUrl && !/^https?:\/\//i.test(String(redirectUrl))) {
-              return sendJson(res, 400, { error: "redirectUrl deve usar http(s)" });
-            }
+            const message = err instanceof Error ? err.message : String(err);
+            server.config.logger.error(`[livepix-dev-bff] ${message}`);
+            return sendJson(res, 400, { error: "Corpo da requisição inválido" });
+          }
+
+          const { amount, currency = "BRL", redirectUrl } = requestBody;
+          const parsedAmount = Number(amount);
+          if (!Number.isInteger(parsedAmount) || parsedAmount <= 0) {
+            return sendJson(res, 400, { error: "amount deve ser inteiro positivo (centavos)" });
+          }
+          if (typeof currency !== "string" || !currency.trim()) {
+            return sendJson(res, 400, { error: "currency deve ser uma string válida" });
+          }
+          if (redirectUrl !== undefined && !isValidHttpUrl(redirectUrl)) {
+            return sendJson(res, 400, { error: "redirectUrl deve ser uma URL http(s) válida" });
+          }
+
+          try {
             const { status, body } = await createPayment({
               amount: parsedAmount,
-              currency: String(currency),
+              currency: currency.trim(),
               redirectUrl,
             });
             return sendJson(res, status, body);
           } catch (err) {
-            server.config.logger.error(`[livepix-dev-bff] ${err.message}`);
+            const message = err instanceof Error ? err.message : String(err);
+            server.config.logger.error(`[livepix-dev-bff] ${message}`);
             return sendJson(res, 502, { error: "Falha ao criar pagamento na LivePix" });
           }
         }

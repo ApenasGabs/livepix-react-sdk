@@ -46,6 +46,11 @@ code {
   background: #eceefa;
   padding: 0.1em 0.35em;
   border-radius: 4px;
+  overflow-wrap: anywhere;
+}
+
+pre code {
+  overflow-wrap: normal;
 }
 
 button:focus-visible,

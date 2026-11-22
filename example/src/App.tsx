@@ -4,6 +4,12 @@ import "./App.css";
 
 type BffStatus = "checking" | "configured" | "unconfigured" | "unavailable";
 
+type BffHealthResponse = {
+  data?: {
+    configured?: boolean;
+  };
+};
+
 const DEFAULT_USERNAME = getEnv("VITE_LIVEPIX_USERNAME", "apenasgabs");
 const DEFAULT_PAYMENT_ENDPOINT = getEnv(
   "VITE_LIVEPIX_PAYMENT_ENDPOINT",
@@ -25,13 +31,19 @@ const useBffStatus = (paymentEndpoint: string): BffStatus => {
     }
     let cancelled = false;
     fetch("/bff/health")
-      .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+      .then((res): Promise<BffHealthResponse> =>
+        res.ok ? (res.json() as Promise<BffHealthResponse>) : Promise.reject(res.status)
+      )
       .then((body) => {
         if (!cancelled) {
           setStatus(body?.data?.configured ? "configured" : "unconfigured");
         }
       })
-      .catch(() => !cancelled && setStatus("unavailable"));
+      .catch(() => {
+        if (!cancelled) {
+          setStatus("unavailable");
+        }
+      });
     return () => {
       cancelled = true;
     };
@@ -67,7 +79,7 @@ await livePix.subscriptionPlans.getSubscriptionPlans();
 await livePix.rewards.getRewards();
 await livePix.controls.skipAlert();`;
 
-function App() {
+const App = () => {
   const [amount, setAmount] = useState(1000);
   const [username, setUsername] = useState(DEFAULT_USERNAME);
   const [hookResult, setHookResult] = useState<string | null>(null);

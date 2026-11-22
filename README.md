@@ -62,7 +62,7 @@ Em Create React App, troque o prefixo `VITE_` por `REACT_APP_`.
 
 O cliente opera em um de dois modos, escolhido automaticamente:
 
-1. **BFF** — quando `paymentEndpoint` (ou `proxyUrl`) é informado: o hook faz `POST { amount, currency, redirectUrl }` para o seu backend e redireciona para o `redirectUrl` retornado (aceita resposta crua ou envelope `{ data }`).
+1. **BFF** — quando `paymentEndpoint` (ou `proxyUrl`) é informado: é enviado `POST { amount, currency, redirectUrl }` para o seu backend (aceitando resposta crua ou envelope `{ data }`). O hook `useLivePix` retorna `{ redirectUrl, reference }` em `createPayment`, enquanto o componente `LivePixButton` realiza o redirecionamento automaticamente.
 2. **Público** — quando apenas `username` (ou um `redirectUrl` pré-gerado) é informado: redireciona para `https://livepix.gg/<username>`, sem backend.
 
 URLs de redirecionamento são validadas: somente `http:`/`https:` são aceitos (bloqueia `javascript:` e `data:`).
@@ -171,10 +171,50 @@ import { createLivePix } from "livepix-react-sdk";
 
 const livePix = createLivePix();
 
+const isValidHttpUrl = (value: unknown): value is string => {
+  if (typeof value !== "string") return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
 export async function POST(request: Request) {
-  const { amount, currency = "BRL", redirectUrl } = await request.json();
-  const payment = await livePix.payments.createPayment(amount, currency, redirectUrl);
-  return Response.json({ data: payment });
+  let body: { amount?: unknown; currency?: unknown; redirectUrl?: unknown };
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "JSON inválido" }, { status: 400 });
+  }
+
+  const { amount, currency = "BRL", redirectUrl } = body;
+  if (
+    typeof amount !== "number" ||
+    !Number.isInteger(amount) ||
+    amount <= 0 ||
+    !isValidHttpUrl(redirectUrl)
+  ) {
+    return Response.json(
+      { error: "amount ou redirectUrl inválido" },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const payment = await livePix.payments.createPayment(
+      amount,
+      typeof currency === "string" && currency.trim() ? currency.trim() : "BRL",
+      redirectUrl
+    );
+    return Response.json({ data: payment });
+  } catch {
+    return Response.json(
+      { error: "Falha ao criar pagamento" },
+      { status: 502 }
+    );
+  }
 }
 ```
 
@@ -206,7 +246,9 @@ Para clientes HTTP customizados, use `createApiClient({ clientId, clientSecret, 
 O diretório [`example/`](./example) contém uma demo Vite com os dois modos e um BFF de desenvolvimento que mantém o segredo no processo Node. Veja o [README do exemplo](./example/README.md).
 
 ```bash
-yarn install && yarn example
+yarn install
+(cd example && yarn install)
+yarn example
 ```
 
 ## Migração da v1
