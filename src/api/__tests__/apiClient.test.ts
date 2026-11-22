@@ -60,8 +60,17 @@ describe("apiClient", () => {
     scope: "payments:read payments:write",
   };
 
+  type GlobalWithRuntime = typeof globalThis & {
+    __LIVEPIX_RUNTIME__?: "browser" | "server";
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
+    (globalThis as GlobalWithRuntime).__LIVEPIX_RUNTIME__ = "server";
+  });
+
+  afterAll(() => {
+    delete (globalThis as GlobalWithRuntime).__LIVEPIX_RUNTIME__;
   });
 
   describe("getAccessToken with OAuth2 and urlencoded payload", () => {
@@ -338,6 +347,94 @@ describe("apiClient", () => {
 
       expect(mockedAxios.get).toHaveBeenCalledTimes(1);
       expect(mockedAxios.post).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("OAuth edge cases, URL normalization, and browser warning", () => {
+    it("throws when OAuth response does not contain access_token", async () => {
+      mockedAxios.post.mockResolvedValueOnce({
+        data: { token_type: "Bearer", expires_in: 3600 },
+      });
+
+      const client = createApiClient(mockConfig);
+      await expect(client.getAccessToken()).rejects.toThrow(
+        /não contém access_token válido/i
+      );
+    });
+
+    it("unwraps OAuth response wrapped in { data: { access_token } } and omits empty scope", async () => {
+      mockedAxios.post.mockResolvedValueOnce({
+        data: {
+          data: {
+            access_token: "wrapped_oauth_token",
+            token_type: "Bearer",
+            expires_in: 3600,
+          },
+        },
+      });
+
+      const client = createApiClient({
+        ...mockConfig,
+        scope: "",
+      });
+      const token = await client.getAccessToken();
+
+      expect(token).toBe("wrapped_oauth_token");
+      const [, calledData] = mockedAxios.post.mock.calls[0];
+      expect((calledData as URLSearchParams).has("scope")).toBe(false);
+    });
+
+    it("refreshes token automatically when cached token expires", async () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date("2026-11-22T00:00:00Z"));
+
+      try {
+        mockedAxios.post
+          .mockResolvedValueOnce({
+            data: { access_token: "short_lived_token", expires_in: 30 },
+          })
+          .mockResolvedValueOnce({
+            data: { access_token: "renewed_token", expires_in: 3600 },
+          });
+
+        const client = createApiClient(mockConfig);
+        expect(await client.getAccessToken()).toBe("short_lived_token");
+
+        // Advance past minimum 10s safety window
+        jest.advanceTimersByTime(15_000);
+        expect(await client.getAccessToken()).toBe("renewed_token");
+        expect(mockedAxios.post).toHaveBeenCalledTimes(2);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it("normalizes relative paths without leading slash in buildUrl", async () => {
+      mockedAxios.post.mockResolvedValueOnce({
+        data: { access_token: "token_123", expires_in: 3600 },
+      });
+      mockedAxios.get.mockResolvedValueOnce({
+        data: { data: { ok: true } },
+      });
+
+      const client = createApiClient(mockConfig);
+      await expect(client.get("v2/account")).resolves.toEqual({ ok: true });
+      expect(mockedAxios.get).toHaveBeenCalledWith(
+        "https://api.livepix.gg/v2/account",
+        { headers: { Authorization: "Bearer token_123" } }
+      );
+    });
+
+    it("emits security warning when createApiClient is instantiated in browser runtime with secret", () => {
+      const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+      (globalThis as GlobalWithRuntime).__LIVEPIX_RUNTIME__ = "browser";
+
+      createApiClient(mockConfig);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[LivePix Security Warning] (createApiClient)")
+      );
+      warnSpy.mockRestore();
     });
   });
 });

@@ -1,6 +1,10 @@
 import { renderHook } from "@testing-library/react";
 import axios from "axios";
-import { getClientId, getClientSecret } from "../../config";
+import {
+  getClientId,
+  getClientSecret,
+  hasValidCredentials,
+} from "../../config";
 import useLivePix, {
   assertSafeRedirectUrl,
   buildPublicDonationUrl,
@@ -113,6 +117,45 @@ describe("useLivePix & Dual Runtime Security", () => {
       expect(() => assertSafeRedirectUrl("javascript:alert(1)")).toThrow(
         /protocolo de url de redirecionamento não permitido/i
       );
+      expect(() => assertSafeRedirectUrl("not-a-valid-url")).toThrow(
+        /url de redirecionamento inválida/i
+      );
+      expect(isSafeHttpUrl("")).toBe(false);
+      expect(isSafeHttpUrl("   ")).toBe(false);
+      expect(isSafeHttpUrl("not-a-valid-url")).toBe(false);
+      expect(buildPublicDonationUrl("@")).toBe("");
+      expect(resolveBffPaymentEndpoint()).toBe("");
+    });
+
+    it("validates credentials per runtime in hasValidCredentials", () => {
+      const globalWithImportMeta = globalThis as typeof globalThis & {
+        import?: { meta?: { env?: Record<string, string | undefined> } };
+      };
+      const prevViteClientId =
+        globalWithImportMeta.import?.meta?.env?.VITE_LIVEPIX_CLIENT_ID;
+
+      (globalThis as GlobalWithRuntime).__LIVEPIX_RUNTIME__ = "browser";
+      expect(hasValidCredentials()).toBe(false);
+      process.env.VITE_LIVEPIX_USERNAME = "apenasgabs";
+      expect(hasValidCredentials()).toBe(true);
+      delete process.env.VITE_LIVEPIX_USERNAME;
+
+      (globalThis as GlobalWithRuntime).__LIVEPIX_RUNTIME__ = "server";
+      process.env.LIVEPIX_CLIENT_ID = "seu_client_id_aqui";
+      process.env.LIVEPIX_CLIENT_SECRET = "seu_client_secret_aqui";
+      expect(hasValidCredentials()).toBe(false);
+
+      process.env.LIVEPIX_CLIENT_ID = "real_id";
+      process.env.LIVEPIX_CLIENT_SECRET = "real_secret";
+      expect(hasValidCredentials()).toBe(true);
+
+      if (
+        globalWithImportMeta.import?.meta?.env &&
+        prevViteClientId !== undefined
+      ) {
+        globalWithImportMeta.import.meta.env.VITE_LIVEPIX_CLIENT_ID =
+          prevViteClientId;
+      }
     });
   });
 
@@ -201,6 +244,54 @@ describe("useLivePix & Dual Runtime Security", () => {
 
       await expect(result.current.createPayment(1500)).rejects.toThrow(
         /protocolo de url de redirecionamento não permitido/i
+      );
+    });
+
+    it("throws when BFF response omits redirectUrl", async () => {
+      mockedAxios.post.mockResolvedValueOnce({
+        data: {
+          reference: "ref_missing_url",
+        },
+      });
+
+      const { result } = renderHook(() =>
+        useLivePix({ paymentEndpoint: "/api/livepix/payments" })
+      );
+
+      await expect(result.current.createPayment(1500)).rejects.toThrow(
+        /URL de redirecionamento não retornada pelo servidor/i
+      );
+    });
+
+    it("supports public mode via redirectUrl alone and delegates livePix.payments.createPayment", async () => {
+      const { result } = renderHook(() =>
+        useLivePix({ redirectUrl: "https://livepix.gg/checkout/direct" })
+      );
+
+      expect(result.current.livePix?.mode).toBe("public");
+      expect(result.current.livePix?.getPublicUrl()).toBe(
+        "https://livepix.gg/checkout/direct"
+      );
+
+      const payment = await result.current.livePix?.payments.createPayment();
+      expect(payment).toEqual({
+        redirectUrl: "https://livepix.gg/checkout/direct",
+        reference: "public_redirect",
+      });
+    });
+
+    it("sets error and throws on createPayment when completely unconfigured", async () => {
+      const { result } = renderHook(() => useLivePix());
+
+      expect(result.current.loading).toBe(false);
+      expect(result.current.livePix).toBeNull();
+      expect(result.current.getPublicUrl()).toBeNull();
+      expect(result.current.error?.message).toMatch(
+        /Configuração do LivePix não encontrada/i
+      );
+
+      await expect(result.current.createPayment()).rejects.toThrow(
+        /Configuração do LivePix ausente no cliente/i
       );
     });
   });

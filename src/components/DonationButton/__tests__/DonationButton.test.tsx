@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom";
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axios from "axios";
 import DonationButton from "../DonationButton";
@@ -62,5 +62,42 @@ describe("DonationButton Component", () => {
     ).toBeInTheDocument();
 
     errorSpy.mockRestore();
+  });
+
+  it("updates donation amount from input (reais -> centavos) and shows loading state", async () => {
+    let resolvePost!: (value: unknown) => void;
+    mockedAxios.post.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolvePost = resolve;
+        })
+    );
+
+    render(<DonationButton paymentEndpoint="/api/livepix/payments" />);
+
+    const input = screen.getByRole("spinbutton");
+    fireEvent.change(input, { target: { value: "25" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /Doar com Pix/i }));
+
+    expect(
+      await screen.findByRole("button", { name: /Processando\.\.\./i })
+    ).toBeDisabled();
+
+    await act(async () => {
+      resolvePost({
+        data: {
+          redirectUrl: "https://livepix.gg/checkout/donation-25",
+          reference: "ref_25",
+        },
+      });
+    });
+
+    expect(mockedAxios.post).toHaveBeenCalledWith("/api/livepix/payments", {
+      amount: 2500,
+      currency: "BRL",
+      redirectUrl: "https://app.example.com/donate",
+    });
+    expect(window.location.href).toBe("https://livepix.gg/checkout/donation-25");
   });
 });

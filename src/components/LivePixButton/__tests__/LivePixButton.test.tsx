@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom";
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axios from "axios";
 import LivePixButton from "../index";
@@ -156,5 +156,58 @@ describe("LivePixButton (Dual Server/Client Security Architecture)", () => {
     ).toBeInTheDocument();
 
     errorSpy.mockRestore();
+  });
+
+  it("shows loading state while BFF payment request is pending", async () => {
+    let resolvePost!: (value: unknown) => void;
+    mockedAxios.post.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolvePost = resolve;
+        })
+    );
+
+    render(<LivePixButton paymentEndpoint="/api/livepix/payments" />);
+
+    fireEvent.click(screen.getByRole("button"));
+    expect(
+      await screen.findByRole("button", { name: /Processando\.\.\./i })
+    ).toBeDisabled();
+
+    await act(async () => {
+      resolvePost({
+        data: {
+          redirectUrl: "https://livepix.gg/checkout/resolved",
+          reference: "ref_resolved",
+        },
+      });
+    });
+
+    expect(window.location.href).toBe("https://livepix.gg/checkout/resolved");
+  });
+
+  it("shows fallback error message when BFF rejects with non-Error value", async () => {
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    mockedAxios.post.mockRejectedValueOnce("network_down");
+
+    render(<LivePixButton paymentEndpoint="/api/livepix/payments" />);
+
+    fireEvent.click(screen.getByRole("button"));
+
+    expect(
+      await screen.findByText(/Erro ao processar pagamento/i)
+    ).toBeInTheDocument();
+
+    errorSpy.mockRestore();
+  });
+
+  it("redirects via public redirectUrl prop when username is omitted", async () => {
+    render(<LivePixButton redirectUrl="https://livepix.gg/checkout/pub" />);
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole("button"));
+    });
+
+    expect(window.location.href).toBe("https://livepix.gg/checkout/pub");
   });
 });
